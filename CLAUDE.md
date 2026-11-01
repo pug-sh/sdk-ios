@@ -90,9 +90,15 @@ review the diff. `make check-proto-pin` proves `proto/` matches the pin.
   byte for byte where Swift's key order agrees with UTF-16 order (ASCII keys) and decoded otherwise;
   keep it passing.
 - **Unicode:** Swift strings are always valid Unicode; truncation cuts on Unicode scalar boundaries
-  through the UTF-8 view, matching Android's code-point cut.
+  through the UTF-8 view, matching Android's code-point cut. Prefixes the server checks (`$`,
+  `cookieless-`) compare UTF-8 bytes with `hasUTF8Prefix`, since `hasPrefix` compares characters.
 - **Foundation differs by platform:** classify `NSNumber` before Swift casts (`as? Bool` matches 0
-  and 1). Darwin and Linux Foundation bridge differently, which is why the tests run on both.
+  and 1); stored JSON is read through `StoredJSON`. Darwin and Linux Foundation bridge differently,
+  which is why the tests run on both.
+- **Unreadable storage is a failure, never an absent key** (where Android reads it as absent): iOS
+  can launch an app before the first unlock after a reboot, when its files cannot be read.
+  `FileStorage` throws, `SafeStorage` moves the client to memory and `InstallTracker` skips
+  detection, so no launch mints a new identity or a false `app_install` over the stored ones.
 - **Logging:** `os.Logger` redacts dynamic strings, so the SDK logs its messages as public, and they
   never contain property values or traits.
 

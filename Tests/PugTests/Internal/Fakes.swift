@@ -84,3 +84,34 @@ struct SeededRandom: RandomNumberGenerator {
         return mixed ^ (mixed >> 31)
     }
 }
+
+/// Throws `failure` from every call, and counts the calls.
+final class ThrowingStorage: Pug.Storage {
+    private let failure: any Error
+    private let count = Locked(0)
+
+    init(_ failure: any Error) {
+        self.failure = failure
+    }
+
+    var calls: Int {
+        count.withLock { $0 }
+    }
+
+    func string(forKey key: String) throws -> String? {
+        try fail()
+    }
+
+    func setString(_ value: String, forKey key: String) throws {
+        try fail()
+    }
+
+    func removeValue(forKey key: String) throws {
+        try fail()
+    }
+
+    private func fail() throws -> Never {
+        count.withLock { $0 += 1 }
+        throw failure
+    }
+}
