@@ -1,4 +1,19 @@
+import Testing
+
 @testable import Pug
+
+extension Array {
+  /// The only element, as Kotlin's `single()`: the test fails unless there is exactly one.
+  func single(sourceLocation: SourceLocation = #_sourceLocation) throws -> Element {
+    try #require(count == 1 ? first : nil, "expected 1 element, got \(count)", sourceLocation: sourceLocation)
+  }
+}
+
+/// What the consent getters answered at one moment.
+struct ConsentAnswer: Equatable, Sendable {
+  let consent: Pug.TrackingConsent?
+  let isPending: Bool
+}
 
 final class RecordingLogger: Pug.Logger {
   struct Entry: Sendable {

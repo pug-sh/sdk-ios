@@ -35,7 +35,7 @@ struct TrackingConsentControllerTests {
   func optOut() {
     let consent = makeController()
 
-    consent.set(.denied)
+    consent.set(.denied, purging: purge)
 
     #expect(consent.consent == .denied)
     #expect(!consent.isGranted)
@@ -47,7 +47,7 @@ struct TrackingConsentControllerTests {
   func optIn() {
     let consent = makeController(default: .denied)
 
-    consent.set(.granted)
+    consent.set(.granted, purging: purge)
 
     #expect(consent.isGranted)
     #expect(!consent.isPending)
@@ -56,13 +56,13 @@ struct TrackingConsentControllerTests {
 
   @Test("choices are only written when persisted")
   func persistence() {
-    makeController(persists: false).set(.denied)
+    makeController(persists: false).set(.denied, purging: purge)
     #expect(memory.string(forKey: Self.key) == nil)
 
     let persisted = makeController(persists: true)
-    persisted.set(.denied)
+    persisted.set(.denied, purging: purge)
     #expect(memory.string(forKey: Self.key) == "denied")
-    persisted.set(.granted)
+    persisted.set(.granted, purging: purge)
     #expect(memory.string(forKey: Self.key) == "granted")
   }
 
@@ -102,7 +102,7 @@ struct TrackingConsentControllerTests {
     memory.setString("denied", forKey: Self.key)
     let consent = makeController(persists: true)
 
-    consent.enforceAtInit()
+    consent.enforceAtInit(purging: purge)
 
     #expect(purge.calls == ["dropQueue", "forgetIdentity"])
   }
@@ -111,7 +111,7 @@ struct TrackingConsentControllerTests {
   func defaultDenialAtInit() {
     let consent = makeController(default: .denied, persists: true)
 
-    consent.enforceAtInit()
+    consent.enforceAtInit(purging: purge)
 
     #expect(purge.calls == ["dropQueue"])
     #expect(logger.warnings.isEmpty)
@@ -122,7 +122,7 @@ struct TrackingConsentControllerTests {
     purge.isIdentified = true
     let consent = makeController(default: .denied)
 
-    consent.enforceAtInit()
+    consent.enforceAtInit(purging: purge)
 
     #expect(purge.calls == ["dropQueue"])
     #expect(logger.warnings.count == 1)
@@ -135,18 +135,60 @@ struct TrackingConsentControllerTests {
   func grantedAtInit() {
     memory.setString("granted", forKey: Self.key)
 
-    makeController(persists: true).enforceAtInit()
-    makeController(persists: false).enforceAtInit()
+    makeController(persists: true).enforceAtInit(purging: purge)
+    makeController(persists: false).enforceAtInit(purging: purge)
 
     #expect(purge.calls.isEmpty)
+  }
+
+  @Test("a stored choice that cannot be read is denied until the user chooses, as it may be an opt-out")
+  func unreadableChoice() {
+    struct Unreadable: Error {}
+    let consent = TrackingConsentController(
+      storage: SafeStorage(ThrowingStorage(Unreadable()), logger: logger.safe()),
+      key: Self.key,
+      logger: logger.safe(),
+      defaultConsent: .granted,
+      persists: true
+    )
+
+    consent.enforceAtInit(purging: purge)
+
+    #expect(consent.consent == .denied)
+    #expect(consent.isPending)
+    #expect(purge.calls == ["dropQueue"])
+    #expect(
+      logger.warnings == [
+        "Storage failed; state is kept in memory only until the app restarts",
+        "The stored tracking consent could not be read, so it is denied until the user chooses: it may be an opt-out",
+      ]
+    )
+    #expect(logger.debugs.isEmpty)
+    consent.set(.granted, purging: purge)
+    #expect(consent.isGranted)
+  }
+
+  @Test("consent that is not persisted is not read, so storage that fails changes nothing")
+  func unreadButNotPersisted() {
+    struct Unreadable: Error {}
+    let consent = TrackingConsentController(
+      storage: SafeStorage(ThrowingStorage(Unreadable()), logger: logger.safe()),
+      key: Self.key,
+      logger: logger.safe(),
+      defaultConsent: .granted,
+      persists: false
+    )
+
+    #expect(consent.isGranted)
+    #expect(logger.warnings.isEmpty)
   }
 
   @Test("denying again purges again")
   func denyingAgain() {
     let consent = makeController()
 
-    consent.set(.denied)
-    consent.set(.denied)
+    consent.set(.denied, purging: purge)
+    consent.set(.denied, purging: purge)
 
     #expect(purge.calls == ["dropQueue", "forgetIdentity", "dropQueue", "forgetIdentity"])
   }
@@ -160,8 +202,7 @@ struct TrackingConsentControllerTests {
       key: Self.key,
       logger: logger.safe(),
       defaultConsent: defaultConsent,
-      persists: persists,
-      purge: purge
+      persists: persists
     )
   }
 }
