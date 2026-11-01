@@ -1,4 +1,10 @@
 extension String {
+    /// Whether the UTF-8 bytes start with those of `prefix`, as the server's `startsWith` compares them.
+    /// `hasPrefix` compares characters, and "$" is no character prefix of "$\u{301}x".
+    func hasUTF8Prefix(_ prefix: String) -> Bool {
+        utf8.starts(with: prefix.utf8)
+    }
+
     /// The longest prefix that fits in `maxBytes` of UTF-8 without splitting a Unicode scalar.
     func truncatedUTF8(maxBytes: Int) -> String {
         let utf8 = self.utf8

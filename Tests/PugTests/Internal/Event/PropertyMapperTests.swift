@@ -265,6 +265,14 @@ struct PropertyMapperTests {
             logger.warnings == [#"Property "$os" on event "kind" was dropped: keys starting with '$' are reserved"#])
     }
 
+    @Test("a dollar sign that starts a character with a combining mark still reserves the key")
+    func reservedKeyWithCombiningMark() {
+        let mapped = mapper.mapCustom(kind: "kind", ["$\u{301}os": "spoofed"])
+
+        #expect(mapped.isEmpty)
+        #expect(logger.warnings.count == 1)
+    }
+
     @Test("auto-property keys must start with a dollar sign")
     func autoKeys() {
         let mapped = mapper.mapAuto(kind: "kind", ["$os": "iOS", "os": "bug"])

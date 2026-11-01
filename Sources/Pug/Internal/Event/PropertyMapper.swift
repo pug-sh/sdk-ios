@@ -56,7 +56,7 @@ struct PropertyMapper: Sendable {
         var mapped: [String: PropertyValue] = [:]
         for (key, value) in properties.sortedByUTF16Key() {
             guard let value = HostValue(value) else { continue }
-            guard key.hasPrefix("$") == auto else {
+            guard key.hasUTF8Prefix("$") == auto else {
                 if auto {
                     logger.warning("Auto-property \"\(key)\" was dropped: auto-property keys start with '$'")
                 } else {

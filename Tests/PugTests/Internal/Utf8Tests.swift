@@ -69,6 +69,16 @@ struct Utf8Tests {
         }
     }
 
+    @Test("UTF-8 prefixes are byte prefixes, even where a combining mark joins the next character")
+    func utf8Prefix() {
+        #expect("$\u{301}x".hasUTF8Prefix("$"))
+        #expect(!"$\u{301}x".hasPrefix("$"))
+        #expect("cookieless-abc".hasUTF8Prefix("cookieless-"))
+        #expect("abc".hasUTF8Prefix(""))
+        #expect(!"ab".hasUTF8Prefix("abc"))
+        #expect(!"\u{E9}".hasUTF8Prefix("e"))
+    }
+
     @Test("entries sort by UTF-16 code units, where Swift's own order differs")
     func utf16KeyOrder() {
         let map = ["\u{FF5E}": 1, "\u{1F30D}": 2, "a": 3, "Z": 4, "\u{E9}": 5, "": 6]
