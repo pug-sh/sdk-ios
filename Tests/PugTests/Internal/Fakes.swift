@@ -54,6 +54,20 @@ struct FixedClock: Clock {
     var nowMillis: Int64 = 1_760_000_000_000
 }
 
+/// Valid, predictable UUIDs: `00000000-0000-7000-8000-000000000001`, then ...02, and so on.
+final class SequentialIds: IdGenerator {
+    private let count = Locked(0)
+
+    func nextId() -> String {
+        let next = count.withLock { count in
+            count += 1
+            return count
+        }
+        let digits = String(next, radix: 16)
+        return "00000000-0000-7000-8000-" + String(repeating: "0", count: max(12 - digits.count, 0)) + digits
+    }
+}
+
 /// SplitMix64: a seeded generator, so randomized tests fail the same way every run.
 struct SeededRandom: RandomNumberGenerator {
     private var state: UInt64

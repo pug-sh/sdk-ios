@@ -3,7 +3,7 @@
 # tools come through SwiftPM, pinned by Package.resolved and Tools/Package.resolved, except Swift
 # itself and buf, which only re-vendoring proto/ needs.
 
-.PHONY: sync-protos proto-latest check-proto-pin protos reference check-codegen verify-version fmt lint build test check ci build-ios test-ios tsan check-ios docker-image
+.PHONY: sync-protos proto-latest check-proto-pin protos protoc reference descriptors typed-track check-codegen verify-version fmt lint build test check ci build-ios test-ios tsan check-ios docker-image
 
 # `ci` must run `protos` before `check-codegen` diffs the generated files. Keep everything serial
 # even under `make -jN`.
@@ -23,13 +23,21 @@ BUF ?= buf
 SWIFTLINT := $(SWIFT) package --package-path Tools --disable-sandbox plugin --allow-writing-to-package-directory swiftlint
 
 REFERENCE := Tests/PugTests/Reference
-GENERATED := $(REFERENCE)
 # What the reference messages cover: the requests the SDK encodes and the response it decodes.
 REFERENCE_PROTOS := proto/sdk/events/v1/events.proto proto/sdk/profiles/v1/profiles.proto proto/common/v1/property_value.proto
+# The well-known events, sorted so the descriptor sets come out the same everywhere.
+EVENT_PROTOS := $(sort $(wildcard proto/common/events/v1/*.proto))
+# What WellKnownEventsTests checks the generated registry against, without source info.
+EVENT_DESCRIPTORS := Tests/PugTests/Resources/events.binpb
+# gen-track's input keeps the source comments, which the generated docs copy.
+TYPED_TRACK_INPUT := .build/typed-track/events.binpb
+TYPED_TRACK := Sources/Pug/Generated
+GENERATED := $(REFERENCE) $(EVENT_DESCRIPTORS) $(TYPED_TRACK)
 # The well-known types the SwiftProtobuf runtime is generated from, for protoc's import path.
 WELL_KNOWN_TYPES := .build/checkouts/swift-protobuf/Protos/Sources/SwiftProtobuf
-# What swift-format owns. Generated files opt out with a swift-format-ignore-file comment.
-FORMATTED := Package.swift Tools/Package.swift Sources Tests
+# What swift-format owns. The reference messages opt out with a swift-format-ignore-file comment;
+# gen-track writes what swift-format would.
+FORMATTED := Package.swift Tools/Package.swift Tools/Sources Sources Tests
 WARNINGS_AS_ERRORS := -Xswiftc -warnings-as-errors
 EM_DASH := $(shell printf '\342\200\224')
 
@@ -51,19 +59,35 @@ check-proto-pin:
 	  || { echo "proto/ diverges from $(PROTO_COMMIT); re-run 'make sync-protos protos'."; exit 1; }
 
 # Everything generated from proto/.
-protos: reference
+protos: reference descriptors typed-track
 
-# The swift-protobuf messages the wire tests compare the SDK's own codec with. protoc and
-# protoc-gen-swift come from the swift-protobuf that Package.resolved pins, so the messages match
-# the runtime the tests link. protoc builds from source the first time, which takes a few minutes.
-reference:
+# protoc and protoc-gen-swift come from the swift-protobuf that Package.resolved pins, so the reference
+# messages match the runtime the tests link. protoc builds from source the first time, which takes a
+# few minutes.
+protoc:
 	$(SWIFT) build -c release --product protoc
 	$(SWIFT) build -c release --product protoc-gen-swift
+
+# The swift-protobuf messages the wire tests compare the SDK's own codec with.
+reference: protoc
 	rm -rf $(REFERENCE)
 	mkdir -p $(REFERENCE)
 	bin="$$($(SWIFT) build -c release --show-bin-path)"; \
 	"$$bin/protoc" --plugin="$$bin/protoc-gen-swift" --swift_opt=FileNaming=PathToUnderscores --swift_out=$(REFERENCE) \
 	  --proto_path=proto --proto_path=$(WELL_KNOWN_TYPES) $(REFERENCE_PROTOS)
+
+descriptors: protoc
+	mkdir -p $(dir $(EVENT_DESCRIPTORS))
+	"$$($(SWIFT) build -c release --show-bin-path)/protoc" --descriptor_set_out=$(EVENT_DESCRIPTORS) \
+	  --proto_path=proto --proto_path=$(WELL_KNOWN_TYPES) $(EVENT_PROTOS)
+
+# The typed track API from the event protos: Pug.track's methods, Pug.Events and the WellKnownEvents
+# registry, written by Tools/gen-track.
+typed-track: protoc
+	mkdir -p $(dir $(TYPED_TRACK_INPUT))
+	"$$($(SWIFT) build -c release --show-bin-path)/protoc" --include_source_info \
+	  --descriptor_set_out=$(TYPED_TRACK_INPUT) --proto_path=proto --proto_path=$(WELL_KNOWN_TYPES) $(EVENT_PROTOS)
+	$(SWIFT) run --package-path Tools -c release gen-track $(TYPED_TRACK_INPUT) $(TYPED_TRACK)
 
 # CI gate: the committed generated files must match a fresh `make protos`, new files included.
 check-codegen:

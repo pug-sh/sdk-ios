@@ -21,6 +21,7 @@ let package = Package(
         .testTarget(
             name: "PugTests",
             dependencies: ["Pug", .product(name: "SwiftProtobuf", package: "swift-protobuf")],
+            resources: [.copy("Resources/events.binpb")],
             swiftSettings: swiftSettings
         ),
     ],
