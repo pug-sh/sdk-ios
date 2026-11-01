@@ -15,7 +15,7 @@ Once 0.1.0 is tagged, add the package in Xcode (File > Add Package Dependencies)
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/pug-sh/sdk-ios.git", from: "0.1.0"),
+  .package(url: "https://github.com/pug-sh/sdk-ios.git", from: "0.1.0"),
 ],
 ```
 

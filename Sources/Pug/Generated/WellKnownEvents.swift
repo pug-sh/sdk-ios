@@ -2,1049 +2,1039 @@
 
 /// The schema of each well-known event, for typed tracking and the checks on untyped events.
 enum WellKnownEvents {
-    static let addToCart = EventSchema(
-        kind: Pug.Events.addToCart,
-        method: "addToCart",
-        fields: [
-            FieldSchema("productId", .string, required: true),
-            FieldSchema("price", .double),
-            FieldSchema("currency", .string),
-            FieldSchema("cartId", .string),
-            FieldSchema("quantity", .int),
-            FieldSchema("category", .string),
-            FieldSchema("brand", .string),
-            FieldSchema("sku", .string),
-        ]
-    )
-    static let apiKeyCreated = EventSchema(
-        kind: Pug.Events.apiKeyCreated,
-        method: "apiKeyCreated",
-        fields: [FieldSchema("apiKeyId", .string), FieldSchema("name", .string), FieldSchema("scope", .string)]
-    )
-    static let apiKeyRevoked = EventSchema(
-        kind: Pug.Events.apiKeyRevoked,
-        method: "apiKeyRevoked",
-        fields: [FieldSchema("apiKeyId", .string), FieldSchema("name", .string), FieldSchema("reason", .string)]
-    )
-    static let appBackgrounded = EventSchema(kind: Pug.Events.appBackgrounded, method: "appBackgrounded")
-    private static let appClose = EventSchema(kind: Pug.Events.appClose, method: "appClose")
-    static let appCrashed = EventSchema(
-        kind: Pug.Events.appCrashed,
-        method: "appCrashed",
-        fields: [FieldSchema("errorMessage", .string), FieldSchema("errorType", .string)]
-    )
-    static let appForegrounded = EventSchema(kind: Pug.Events.appForegrounded, method: "appForegrounded")
-    private static let appInstall = EventSchema(
-        kind: Pug.Events.appInstall,
-        method: "appInstall",
-        fields: [FieldSchema("appVersion", .string), FieldSchema("installSource", .string)]
-    )
-    private static let appOpen = EventSchema(kind: Pug.Events.appOpen, method: "appOpen")
-    private static let appUpdate = EventSchema(
-        kind: Pug.Events.appUpdate,
-        method: "appUpdate",
-        fields: [FieldSchema("appVersion", .string, required: true), FieldSchema("previousVersion", .string)]
-    )
-    static let audioCompleted = EventSchema(
-        kind: Pug.Events.audioCompleted,
-        method: "audioCompleted",
-        fields: [FieldSchema("audioId", .string, required: true)]
-    )
-    static let audioPause = EventSchema(
-        kind: Pug.Events.audioPause,
-        method: "audioPause",
-        fields: [FieldSchema("audioId", .string, required: true), FieldSchema("position", .duration)]
-    )
-    static let audioPlay = EventSchema(
-        kind: Pug.Events.audioPlay,
-        method: "audioPlay",
-        fields: [FieldSchema("audioId", .string, required: true), FieldSchema("position", .duration)]
-    )
-    static let audioSeeked = EventSchema(
-        kind: Pug.Events.audioSeeked,
-        method: "audioSeeked",
-        fields: [
-            FieldSchema("audioId", .string, required: true),
-            FieldSchema("fromPosition", .duration),
-            FieldSchema("toPosition", .duration),
-        ]
-    )
-    static let audioStarted = EventSchema(
-        kind: Pug.Events.audioStarted,
-        method: "audioStarted",
-        fields: [FieldSchema("audioId", .string, required: true)]
-    )
-    static let cartViewed = EventSchema(
-        kind: Pug.Events.cartViewed,
-        method: "cartViewed",
-        fields: [
-            FieldSchema("cartId", .string),
-            FieldSchema("itemCount", .int),
-            FieldSchema("amount", .double),
-            FieldSchema("currency", .string),
-        ]
-    )
-    static let chatArchived = EventSchema(
-        kind: Pug.Events.chatArchived,
-        method: "chatArchived",
-        fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("conversationType", .string)]
-    )
-    static let chatAttachmentDownloaded = EventSchema(
-        kind: Pug.Events.chatAttachmentDownloaded,
-        method: "chatAttachmentDownloaded",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("messageId", .string),
-            FieldSchema("attachmentId", .string, required: true),
-            FieldSchema("attachmentType", .string),
-            FieldSchema("sizeBytes", .int),
-            FieldSchema("threadId", .string),
-        ]
-    )
-    static let chatAttachmentUploaded = EventSchema(
-        kind: Pug.Events.chatAttachmentUploaded,
-        method: "chatAttachmentUploaded",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("messageId", .string),
-            FieldSchema("attachmentId", .string, required: true),
-            FieldSchema("attachmentType", .string),
-            FieldSchema("sizeBytes", .int),
-            FieldSchema("threadId", .string),
-        ]
-    )
-    static let chatCallJoined = EventSchema(
-        kind: Pug.Events.chatCallJoined,
-        method: "chatCallJoined",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("callId", .string, required: true),
-            FieldSchema("callType", .string),
-        ]
-    )
-    static let chatCallLeft = EventSchema(
-        kind: Pug.Events.chatCallLeft,
-        method: "chatCallLeft",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("callId", .string, required: true),
-            FieldSchema("callType", .string),
-            FieldSchema("duration", .duration),
-        ]
-    )
-    static let chatCallRecordingStarted = EventSchema(
-        kind: Pug.Events.chatCallRecordingStarted,
-        method: "chatCallRecordingStarted",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("callId", .string, required: true),
-        ]
-    )
-    static let chatCallScreenShared = EventSchema(
-        kind: Pug.Events.chatCallScreenShared,
-        method: "chatCallScreenShared",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("callId", .string, required: true),
-        ]
-    )
-    static let chatCallStarted = EventSchema(
-        kind: Pug.Events.chatCallStarted,
-        method: "chatCallStarted",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("callId", .string, required: true),
-            FieldSchema("callType", .string),
-        ]
-    )
-    static let chatCreated = EventSchema(
-        kind: Pug.Events.chatCreated,
-        method: "chatCreated",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("conversationType", .string),
-            FieldSchema("participantCount", .int),
-        ]
-    )
-    static let chatDeleted = EventSchema(
-        kind: Pug.Events.chatDeleted,
-        method: "chatDeleted",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("conversationType", .string),
-            FieldSchema("reason", .string),
-        ]
-    )
-    static let chatJoined = EventSchema(
-        kind: Pug.Events.chatJoined,
-        method: "chatJoined",
-        fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("conversationType", .string)]
-    )
-    static let chatLeft = EventSchema(
-        kind: Pug.Events.chatLeft,
-        method: "chatLeft",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("conversationType", .string),
-            FieldSchema("reason", .string),
-        ]
-    )
-    static let chatMemberAdded = EventSchema(
-        kind: Pug.Events.chatMemberAdded,
-        method: "chatMemberAdded",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("memberId", .string, required: true),
-            FieldSchema("role", .string),
-        ]
-    )
-    static let chatMemberMuted = EventSchema(
-        kind: Pug.Events.chatMemberMuted,
-        method: "chatMemberMuted",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("memberId", .string, required: true),
-            FieldSchema("muteDuration", .duration),
-        ]
-    )
-    static let chatMemberRemoved = EventSchema(
-        kind: Pug.Events.chatMemberRemoved,
-        method: "chatMemberRemoved",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("memberId", .string, required: true),
-            FieldSchema("reason", .string),
-        ]
-    )
-    static let chatMemberRoleChanged = EventSchema(
-        kind: Pug.Events.chatMemberRoleChanged,
-        method: "chatMemberRoleChanged",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("memberId", .string, required: true),
-            FieldSchema("previousRole", .string),
-            FieldSchema("newRole", .string, required: true),
-        ]
-    )
-    static let chatMessageDeleted = EventSchema(
-        kind: Pug.Events.chatMessageDeleted,
-        method: "chatMessageDeleted",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("messageId", .string),
-            FieldSchema("conversationType", .string),
-            FieldSchema("reason", .string),
-            FieldSchema("threadId", .string),
-        ]
-    )
-    static let chatMessageEdited = EventSchema(
-        kind: Pug.Events.chatMessageEdited,
-        method: "chatMessageEdited",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("messageId", .string),
-            FieldSchema("conversationType", .string),
-            FieldSchema("threadId", .string),
-        ]
-    )
-    static let chatMessageFailed = EventSchema(
-        kind: Pug.Events.chatMessageFailed,
-        method: "chatMessageFailed",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("messageId", .string),
-            FieldSchema("conversationType", .string),
-            FieldSchema("reason", .string, required: true),
-            FieldSchema("threadId", .string),
-        ]
-    )
-    static let chatMessagePinned = EventSchema(
-        kind: Pug.Events.chatMessagePinned,
-        method: "chatMessagePinned",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("messageId", .string),
-            FieldSchema("conversationType", .string),
-            FieldSchema("threadId", .string),
-        ]
-    )
-    static let chatMessageRead = EventSchema(
-        kind: Pug.Events.chatMessageRead,
-        method: "chatMessageRead",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("messageId", .string),
-            FieldSchema("conversationType", .string),
-            FieldSchema("threadId", .string),
-        ]
-    )
-    static let chatMessageReceived = EventSchema(
-        kind: Pug.Events.chatMessageReceived,
-        method: "chatMessageReceived",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("messageId", .string),
-            FieldSchema("conversationType", .string),
-            FieldSchema("messageType", .string),
-            FieldSchema("characterCount", .int),
-            FieldSchema("attachmentCount", .int),
-            FieldSchema("threadId", .string),
-            FieldSchema("parentMessageId", .string),
-        ]
-    )
-    static let chatMessageSent = EventSchema(
-        kind: Pug.Events.chatMessageSent,
-        method: "chatMessageSent",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("messageId", .string),
-            FieldSchema("conversationType", .string),
-            FieldSchema("messageType", .string),
-            FieldSchema("characterCount", .int),
-            FieldSchema("attachmentCount", .int),
-            FieldSchema("threadId", .string),
-            FieldSchema("parentMessageId", .string),
-        ]
-    )
-    static let chatMessageUnpinned = EventSchema(
-        kind: Pug.Events.chatMessageUnpinned,
-        method: "chatMessageUnpinned",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("messageId", .string),
-            FieldSchema("conversationType", .string),
-            FieldSchema("threadId", .string),
-        ]
-    )
-    static let chatReactionAdded = EventSchema(
-        kind: Pug.Events.chatReactionAdded,
-        method: "chatReactionAdded",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("messageId", .string),
-            FieldSchema("reaction", .string, required: true),
-            FieldSchema("threadId", .string),
-        ]
-    )
-    static let chatReactionRemoved = EventSchema(
-        kind: Pug.Events.chatReactionRemoved,
-        method: "chatReactionRemoved",
-        fields: [
-            FieldSchema("conversationId", .string, required: true),
-            FieldSchema("messageId", .string),
-            FieldSchema("reaction", .string, required: true),
-            FieldSchema("threadId", .string),
-        ]
-    )
-    static let chatTypingStarted = EventSchema(
-        kind: Pug.Events.chatTypingStarted,
-        method: "chatTypingStarted",
-        fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("conversationType", .string)]
-    )
-    static let chatTypingStopped = EventSchema(
-        kind: Pug.Events.chatTypingStopped,
-        method: "chatTypingStopped",
-        fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("conversationType", .string)]
-    )
-    static let chatUnarchived = EventSchema(
-        kind: Pug.Events.chatUnarchived,
-        method: "chatUnarchived",
-        fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("conversationType", .string)]
-    )
-    static let chatUserBlocked = EventSchema(
-        kind: Pug.Events.chatUserBlocked,
-        method: "chatUserBlocked",
-        fields: [FieldSchema("userId", .string, required: true)]
-    )
-    static let checkoutStarted = EventSchema(
-        kind: Pug.Events.checkoutStarted,
-        method: "checkoutStarted",
-        fields: [
-            FieldSchema("productId", .string),
-            FieldSchema("amount", .double),
-            FieldSchema("currency", .string),
-            FieldSchema("cartId", .string),
-            FieldSchema("checkoutId", .string),
-            FieldSchema("itemCount", .int),
-        ]
-    )
-    static let checkoutStepCompleted = EventSchema(
-        kind: Pug.Events.checkoutStepCompleted,
-        method: "checkoutStepCompleted",
-        fields: [
-            FieldSchema("checkoutId", .string, required: true),
-            FieldSchema("step", .string, required: true),
-            FieldSchema("stepIndex", .int),
-        ]
-    )
-    static let couponApplied = EventSchema(
-        kind: Pug.Events.couponApplied,
-        method: "couponApplied",
-        fields: [
-            FieldSchema("couponId", .string, required: true),
-            FieldSchema("couponCode", .string),
-            FieldSchema("cartId", .string),
-            FieldSchema("discountAmount", .double),
-            FieldSchema("currency", .string),
-        ]
-    )
-    static let couponRemoved = EventSchema(
-        kind: Pug.Events.couponRemoved,
-        method: "couponRemoved",
-        fields: [
-            FieldSchema("couponId", .string, required: true),
-            FieldSchema("couponCode", .string),
-            FieldSchema("cartId", .string),
-            FieldSchema("reason", .string),
-        ]
-    )
-    static let emailVerified = EventSchema(kind: Pug.Events.emailVerified, method: "emailVerified")
-    static let errorOccurred = EventSchema(
-        kind: Pug.Events.errorOccurred,
-        method: "errorOccurred",
-        fields: [
-            FieldSchema("errorCode", .string, required: true),
-            FieldSchema("message", .string),
-            FieldSchema("severity", .string),
-            FieldSchema("unhandled", .bool),
-            FieldSchema("stack", .string),
-        ]
-    )
-    static let exportCompleted = EventSchema(
-        kind: Pug.Events.exportCompleted,
-        method: "exportCompleted",
-        fields: [
-            FieldSchema("exportId", .string, required: true),
-            FieldSchema("exportType", .string),
-            FieldSchema("sizeBytes", .int),
-        ]
-    )
-    static let exportStarted = EventSchema(
-        kind: Pug.Events.exportStarted,
-        method: "exportStarted",
-        fields: [FieldSchema("exportId", .string, required: true), FieldSchema("exportType", .string)]
-    )
-    static let featureUsed = EventSchema(
-        kind: Pug.Events.featureUsed,
-        method: "featureUsed",
-        fields: [FieldSchema("featureId", .string, required: true), FieldSchema("featureName", .string)]
-    )
-    static let feedbackSubmitted = EventSchema(
-        kind: Pug.Events.feedbackSubmitted,
-        method: "feedbackSubmitted",
-        fields: [FieldSchema("feedbackId", .string), FieldSchema("category", .string), FieldSchema("comment", .string)]
-    )
-    static let fileDownloaded = EventSchema(
-        kind: Pug.Events.fileDownloaded,
-        method: "fileDownloaded",
-        fields: [
-            FieldSchema("fileId", .string, required: true),
-            FieldSchema("fileName", .string),
-            FieldSchema("fileType", .string),
-            FieldSchema("sizeBytes", .int),
-        ]
-    )
-    static let fileUploaded = EventSchema(
-        kind: Pug.Events.fileUploaded,
-        method: "fileUploaded",
-        fields: [
-            FieldSchema("fileId", .string, required: true),
-            FieldSchema("fileName", .string),
-            FieldSchema("fileType", .string),
-            FieldSchema("sizeBytes", .int),
-        ]
-    )
-    static let filterApplied = EventSchema(
-        kind: Pug.Events.filterApplied,
-        method: "filterApplied",
-        fields: [FieldSchema("key", .string, required: true), FieldSchema("value", .string)]
-    )
-    static let formStart = EventSchema(
-        kind: Pug.Events.formStart,
-        method: "formStart",
-        fields: [FieldSchema("formId", .string, required: true), FieldSchema("formName", .string)]
-    )
-    static let formSubmit = EventSchema(
-        kind: Pug.Events.formSubmit,
-        method: "formSubmit",
-        fields: [
-            FieldSchema("formId", .string, required: true),
-            FieldSchema("formName", .string),
-            FieldSchema("action", .string),
-        ]
-    )
-    static let helpArticleViewed = EventSchema(
-        kind: Pug.Events.helpArticleViewed,
-        method: "helpArticleViewed",
-        fields: [
-            FieldSchema("articleId", .string, required: true),
-            FieldSchema("articleTitle", .string),
-            FieldSchema("category", .string),
-        ]
-    )
-    static let integrationConnected = EventSchema(
-        kind: Pug.Events.integrationConnected,
-        method: "integrationConnected",
-        fields: [FieldSchema("integrationId", .string), FieldSchema("integrationType", .string, required: true)]
-    )
-    static let integrationDisconnected = EventSchema(
-        kind: Pug.Events.integrationDisconnected,
-        method: "integrationDisconnected",
-        fields: [
-            FieldSchema("integrationId", .string),
-            FieldSchema("integrationType", .string, required: true),
-            FieldSchema("reason", .string),
-        ]
-    )
-    static let inviteAccepted = EventSchema(
-        kind: Pug.Events.inviteAccepted,
-        method: "inviteAccepted",
-        fields: [
-            FieldSchema("inviteId", .string),
-            FieldSchema("workspaceId", .string),
-            FieldSchema("inviterId", .string),
-            FieldSchema("inviteeId", .string),
-            FieldSchema("inviteeEmail", .string),
-            FieldSchema("role", .string),
-        ]
-    )
-    static let inviteSent = EventSchema(
-        kind: Pug.Events.inviteSent,
-        method: "inviteSent",
-        fields: [
-            FieldSchema("inviteId", .string),
-            FieldSchema("workspaceId", .string),
-            FieldSchema("inviterId", .string),
-            FieldSchema("inviteeId", .string),
-            FieldSchema("inviteeEmail", .string),
-            FieldSchema("role", .string),
-        ]
-    )
-    static let invoiceFailed = EventSchema(
-        kind: Pug.Events.invoiceFailed,
-        method: "invoiceFailed",
-        fields: [
-            FieldSchema("invoiceId", .string, required: true),
-            FieldSchema("subscriptionId", .string),
-            FieldSchema("amount", .double),
-            FieldSchema("currency", .string),
-            FieldSchema("reason", .string),
-        ]
-    )
-    static let invoicePaid = EventSchema(
-        kind: Pug.Events.invoicePaid,
-        method: "invoicePaid",
-        fields: [
-            FieldSchema("invoiceId", .string, required: true),
-            FieldSchema("subscriptionId", .string),
-            FieldSchema("amount", .double),
-            FieldSchema("currency", .string),
-        ]
-    )
-    static let mfaDisabled = EventSchema(
-        kind: Pug.Events.mfaDisabled,
-        method: "mfaDisabled",
-        fields: [FieldSchema("method", .string)]
-    )
-    static let mfaEnabled = EventSchema(
-        kind: Pug.Events.mfaEnabled,
-        method: "mfaEnabled",
-        fields: [FieldSchema("method", .string)]
-    )
-    static let notificationClicked = EventSchema(
-        kind: Pug.Events.notificationClicked,
-        method: "notificationClicked",
-        fields: [FieldSchema("campaignId", .string, required: true), FieldSchema("notificationType", .string)]
-    )
-    static let notificationDismissed = EventSchema(
-        kind: Pug.Events.notificationDismissed,
-        method: "notificationDismissed",
-        fields: [FieldSchema("campaignId", .string, required: true), FieldSchema("notificationType", .string)]
-    )
-    static let notificationReceived = EventSchema(
-        kind: Pug.Events.notificationReceived,
-        method: "notificationReceived",
-        fields: [FieldSchema("campaignId", .string, required: true), FieldSchema("notificationType", .string)]
-    )
-    static let npsSubmitted = EventSchema(
-        kind: Pug.Events.npsSubmitted,
-        method: "npsSubmitted",
-        fields: [FieldSchema("score", .int), FieldSchema("comment", .string)]
-    )
-    static let orderRefunded = EventSchema(
-        kind: Pug.Events.orderRefunded,
-        method: "orderRefunded",
-        fields: [
-            FieldSchema("orderId", .string, required: true),
-            FieldSchema("amount", .double),
-            FieldSchema("currency", .string),
-            FieldSchema("reason", .string),
-        ]
-    )
-    static let passwordResetCompleted = EventSchema(
-        kind: Pug.Events.passwordResetCompleted,
-        method: "passwordResetCompleted"
-    )
-    static let passwordResetRequested = EventSchema(
-        kind: Pug.Events.passwordResetRequested,
-        method: "passwordResetRequested"
-    )
-    static let paymentFailed = EventSchema(
-        kind: Pug.Events.paymentFailed,
-        method: "paymentFailed",
-        fields: [
-            FieldSchema("paymentId", .string),
-            FieldSchema("invoiceId", .string),
-            FieldSchema("subscriptionId", .string),
-            FieldSchema("amount", .double),
-            FieldSchema("currency", .string),
-            FieldSchema("reason", .string),
-        ]
-    )
-    static let paymentMethodAdded = EventSchema(
-        kind: Pug.Events.paymentMethodAdded,
-        method: "paymentMethodAdded",
-        fields: [FieldSchema("paymentMethodId", .string), FieldSchema("paymentMethodType", .string)]
-    )
-    static let paymentMethodRemoved = EventSchema(
-        kind: Pug.Events.paymentMethodRemoved,
-        method: "paymentMethodRemoved",
-        fields: [FieldSchema("paymentMethodId", .string), FieldSchema("paymentMethodType", .string)]
-    )
-    static let paymentSucceeded = EventSchema(
-        kind: Pug.Events.paymentSucceeded,
-        method: "paymentSucceeded",
-        fields: [
-            FieldSchema("paymentId", .string),
-            FieldSchema("invoiceId", .string),
-            FieldSchema("subscriptionId", .string),
-            FieldSchema("amount", .double),
-            FieldSchema("currency", .string),
-        ]
-    )
-    static let productListViewed = EventSchema(
-        kind: Pug.Events.productListViewed,
-        method: "productListViewed",
-        fields: [
-            FieldSchema("listId", .string, required: true),
-            FieldSchema("listName", .string),
-            FieldSchema("category", .string),
-            FieldSchema("itemCount", .int),
-        ]
-    )
-    static let productViewed = EventSchema(
-        kind: Pug.Events.productViewed,
-        method: "productViewed",
-        fields: [
-            FieldSchema("productId", .string, required: true),
-            FieldSchema("productName", .string),
-            FieldSchema("category", .string),
-            FieldSchema("brand", .string),
-            FieldSchema("sku", .string),
-            FieldSchema("price", .double),
-            FieldSchema("currency", .string),
-        ]
-    )
-    static let purchase = EventSchema(
-        kind: Pug.Events.purchase,
-        method: "purchase",
-        fields: [
-            FieldSchema("productId", .string),
-            FieldSchema("amount", .double),
-            FieldSchema("currency", .string),
-            FieldSchema("orderId", .string),
-            FieldSchema("quantity", .int),
-            FieldSchema("category", .string),
-            FieldSchema("brand", .string),
-            FieldSchema("sku", .string),
-        ]
-    )
-    static let recommendationClicked = EventSchema(
-        kind: Pug.Events.recommendationClicked,
-        method: "recommendationClicked",
-        fields: [
-            FieldSchema("recommendationId", .string, required: true),
-            FieldSchema("itemId", .string, required: true),
-            FieldSchema("source", .string),
-            FieldSchema("index", .int),
-        ]
-    )
-    static let recommendationViewed = EventSchema(
-        kind: Pug.Events.recommendationViewed,
-        method: "recommendationViewed",
-        fields: [
-            FieldSchema("recommendationId", .string, required: true),
-            FieldSchema("itemId", .string),
-            FieldSchema("source", .string),
-            FieldSchema("index", .int),
-        ]
-    )
-    static let refundFailed = EventSchema(
-        kind: Pug.Events.refundFailed,
-        method: "refundFailed",
-        fields: [
-            FieldSchema("orderId", .string, required: true),
-            FieldSchema("refundId", .string),
-            FieldSchema("amount", .double),
-            FieldSchema("currency", .string),
-            FieldSchema("reason", .string),
-        ]
-    )
-    static let removeFromCart = EventSchema(
-        kind: Pug.Events.removeFromCart,
-        method: "removeFromCart",
-        fields: [
-            FieldSchema("productId", .string, required: true),
-            FieldSchema("price", .double),
-            FieldSchema("currency", .string),
-            FieldSchema("cartId", .string),
-            FieldSchema("quantity", .int),
-            FieldSchema("category", .string),
-            FieldSchema("brand", .string),
-            FieldSchema("sku", .string),
-        ]
-    )
-    private static let screenView = EventSchema(
-        kind: Pug.Events.screenView,
-        method: "screenView",
-        fields: [FieldSchema("screenName", .string, required: true), FieldSchema("screenClass", .string)]
-    )
-    static let scroll = EventSchema(
-        kind: Pug.Events.scroll,
-        method: "scroll",
-        fields: [FieldSchema("percent", .int), FieldSchema("scrollY", .int)]
-    )
-    static let search = EventSchema(
-        kind: Pug.Events.search,
-        method: "search",
-        fields: [FieldSchema("query", .string, required: true)]
-    )
-    static let searchResultClicked = EventSchema(
-        kind: Pug.Events.searchResultClicked,
-        method: "searchResultClicked",
-        fields: [
-            FieldSchema("query", .string, required: true),
-            FieldSchema("resultId", .string, required: true),
-            FieldSchema("index", .int),
-        ]
-    )
-    static let share = EventSchema(kind: Pug.Events.share, method: "share")
-    static let signin = EventSchema(kind: Pug.Events.signin, method: "signin")
-    static let signout = EventSchema(kind: Pug.Events.signout, method: "signout")
-    static let signup = EventSchema(kind: Pug.Events.signup, method: "signup")
-    static let sortChanged = EventSchema(
-        kind: Pug.Events.sortChanged,
-        method: "sortChanged",
-        fields: [FieldSchema("key", .string, required: true), FieldSchema("direction", .string)]
-    )
-    static let subscriptionCanceled = EventSchema(
-        kind: Pug.Events.subscriptionCanceled,
-        method: "subscriptionCanceled",
-        fields: [
-            FieldSchema("subscriptionId", .string, required: true),
-            FieldSchema("planId", .string),
-            FieldSchema("reason", .string),
-        ]
-    )
-    static let subscriptionChanged = EventSchema(
-        kind: Pug.Events.subscriptionChanged,
-        method: "subscriptionChanged",
-        fields: [
-            FieldSchema("subscriptionId", .string, required: true),
-            FieldSchema("previousPlanId", .string),
-            FieldSchema("newPlanId", .string),
-        ]
-    )
-    static let subscriptionPaused = EventSchema(
-        kind: Pug.Events.subscriptionPaused,
-        method: "subscriptionPaused",
-        fields: [
-            FieldSchema("subscriptionId", .string, required: true),
-            FieldSchema("planId", .string),
-            FieldSchema("reason", .string),
-        ]
-    )
-    static let subscriptionRenewed = EventSchema(
-        kind: Pug.Events.subscriptionRenewed,
-        method: "subscriptionRenewed",
-        fields: [
-            FieldSchema("subscriptionId", .string, required: true),
-            FieldSchema("planId", .string),
-            FieldSchema("amount", .double),
-            FieldSchema("currency", .string),
-        ]
-    )
-    static let subscriptionResumed = EventSchema(
-        kind: Pug.Events.subscriptionResumed,
-        method: "subscriptionResumed",
-        fields: [
-            FieldSchema("subscriptionId", .string, required: true),
-            FieldSchema("planId", .string),
-            FieldSchema("reason", .string),
-        ]
-    )
-    static let subscriptionStarted = EventSchema(
-        kind: Pug.Events.subscriptionStarted,
-        method: "subscriptionStarted",
-        fields: [
-            FieldSchema("subscriptionId", .string, required: true),
-            FieldSchema("planId", .string),
-            FieldSchema("amount", .double),
-            FieldSchema("currency", .string),
-        ]
-    )
-    static let subscriptionTrialWillEnd = EventSchema(
-        kind: Pug.Events.subscriptionTrialWillEnd,
-        method: "subscriptionTrialWillEnd",
-        fields: [
-            FieldSchema("subscriptionId", .string, required: true),
-            FieldSchema("planId", .string),
-            FieldSchema("trialId", .string),
-        ]
-    )
-    static let supportChatStarted = EventSchema(
-        kind: Pug.Events.supportChatStarted,
-        method: "supportChatStarted",
-        fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("topic", .string)]
-    )
-    static let supportTicketCreated = EventSchema(
-        kind: Pug.Events.supportTicketCreated,
-        method: "supportTicketCreated",
-        fields: [
-            FieldSchema("ticketId", .string, required: true),
-            FieldSchema("category", .string),
-            FieldSchema("priority", .string),
-        ]
-    )
-    static let supportTicketResolved = EventSchema(
-        kind: Pug.Events.supportTicketResolved,
-        method: "supportTicketResolved",
-        fields: [FieldSchema("ticketId", .string, required: true), FieldSchema("resolution", .string)]
-    )
-    static let surveyCompleted = EventSchema(
-        kind: Pug.Events.surveyCompleted,
-        method: "surveyCompleted",
-        fields: [FieldSchema("surveyId", .string, required: true), FieldSchema("questionCount", .int)]
-    )
-    static let surveyStarted = EventSchema(
-        kind: Pug.Events.surveyStarted,
-        method: "surveyStarted",
-        fields: [FieldSchema("surveyId", .string, required: true)]
-    )
-    static let trialConverted = EventSchema(
-        kind: Pug.Events.trialConverted,
-        method: "trialConverted",
-        fields: [
-            FieldSchema("trialId", .string),
-            FieldSchema("subscriptionId", .string),
-            FieldSchema("planId", .string),
-        ]
-    )
-    static let trialStarted = EventSchema(
-        kind: Pug.Events.trialStarted,
-        method: "trialStarted",
-        fields: [FieldSchema("trialId", .string), FieldSchema("planId", .string)]
-    )
-    static let videoCompleted = EventSchema(
-        kind: Pug.Events.videoCompleted,
-        method: "videoCompleted",
-        fields: [FieldSchema("videoId", .string, required: true)]
-    )
-    static let videoPause = EventSchema(
-        kind: Pug.Events.videoPause,
-        method: "videoPause",
-        fields: [FieldSchema("videoId", .string, required: true), FieldSchema("position", .duration)]
-    )
-    static let videoPlay = EventSchema(
-        kind: Pug.Events.videoPlay,
-        method: "videoPlay",
-        fields: [FieldSchema("videoId", .string, required: true), FieldSchema("position", .duration)]
-    )
-    static let videoSeeked = EventSchema(
-        kind: Pug.Events.videoSeeked,
-        method: "videoSeeked",
-        fields: [
-            FieldSchema("videoId", .string, required: true),
-            FieldSchema("fromPosition", .duration),
-            FieldSchema("toPosition", .duration),
-        ]
-    )
-    static let videoStarted = EventSchema(
-        kind: Pug.Events.videoStarted,
-        method: "videoStarted",
-        fields: [FieldSchema("videoId", .string, required: true)]
-    )
-    static let wishlistAdded = EventSchema(
-        kind: Pug.Events.wishlistAdded,
-        method: "wishlistAdded",
-        fields: [
-            FieldSchema("productId", .string, required: true),
-            FieldSchema("wishlistId", .string),
-            FieldSchema("price", .double),
-            FieldSchema("currency", .string),
-        ]
-    )
-    static let wishlistRemoved = EventSchema(
-        kind: Pug.Events.wishlistRemoved,
-        method: "wishlistRemoved",
-        fields: [FieldSchema("productId", .string, required: true), FieldSchema("wishlistId", .string)]
-    )
-    static let workspaceCreated = EventSchema(
-        kind: Pug.Events.workspaceCreated,
-        method: "workspaceCreated",
-        fields: [FieldSchema("workspaceId", .string, required: true), FieldSchema("workspaceName", .string)]
-    )
-    static let workspaceDeleted = EventSchema(
-        kind: Pug.Events.workspaceDeleted,
-        method: "workspaceDeleted",
-        fields: [FieldSchema("workspaceId", .string, required: true), FieldSchema("reason", .string)]
-    )
-    static let workspaceJoined = EventSchema(
-        kind: Pug.Events.workspaceJoined,
-        method: "workspaceJoined",
-        fields: [FieldSchema("workspaceId", .string, required: true), FieldSchema("role", .string)]
-    )
-    static let workspaceRoleChanged = EventSchema(
-        kind: Pug.Events.workspaceRoleChanged,
-        method: "workspaceRoleChanged",
-        fields: [
-            FieldSchema("workspaceId", .string, required: true),
-            FieldSchema("memberId", .string, required: true),
-            FieldSchema("previousRole", .string),
-            FieldSchema("newRole", .string, required: true),
-        ]
-    )
-    static let workspaceSettingsUpdated = EventSchema(
-        kind: Pug.Events.workspaceSettingsUpdated,
-        method: "workspaceSettingsUpdated",
-        fields: [FieldSchema("workspaceId", .string, required: true), FieldSchema("setting", .string, required: true)]
-    )
-
-    static let all = [
-        addToCart,
-        apiKeyCreated,
-        apiKeyRevoked,
-        appBackgrounded,
-        appClose,
-        appCrashed,
-        appForegrounded,
-        appInstall,
-        appOpen,
-        appUpdate,
-        audioCompleted,
-        audioPause,
-        audioPlay,
-        audioSeeked,
-        audioStarted,
-        cartViewed,
-        chatArchived,
-        chatAttachmentDownloaded,
-        chatAttachmentUploaded,
-        chatCallJoined,
-        chatCallLeft,
-        chatCallRecordingStarted,
-        chatCallScreenShared,
-        chatCallStarted,
-        chatCreated,
-        chatDeleted,
-        chatJoined,
-        chatLeft,
-        chatMemberAdded,
-        chatMemberMuted,
-        chatMemberRemoved,
-        chatMemberRoleChanged,
-        chatMessageDeleted,
-        chatMessageEdited,
-        chatMessageFailed,
-        chatMessagePinned,
-        chatMessageRead,
-        chatMessageReceived,
-        chatMessageSent,
-        chatMessageUnpinned,
-        chatReactionAdded,
-        chatReactionRemoved,
-        chatTypingStarted,
-        chatTypingStopped,
-        chatUnarchived,
-        chatUserBlocked,
-        checkoutStarted,
-        checkoutStepCompleted,
-        couponApplied,
-        couponRemoved,
-        emailVerified,
-        errorOccurred,
-        exportCompleted,
-        exportStarted,
-        featureUsed,
-        feedbackSubmitted,
-        fileDownloaded,
-        fileUploaded,
-        filterApplied,
-        formStart,
-        formSubmit,
-        helpArticleViewed,
-        integrationConnected,
-        integrationDisconnected,
-        inviteAccepted,
-        inviteSent,
-        invoiceFailed,
-        invoicePaid,
-        mfaDisabled,
-        mfaEnabled,
-        notificationClicked,
-        notificationDismissed,
-        notificationReceived,
-        npsSubmitted,
-        orderRefunded,
-        passwordResetCompleted,
-        passwordResetRequested,
-        paymentFailed,
-        paymentMethodAdded,
-        paymentMethodRemoved,
-        paymentSucceeded,
-        productListViewed,
-        productViewed,
-        purchase,
-        recommendationClicked,
-        recommendationViewed,
-        refundFailed,
-        removeFromCart,
-        screenView,
-        scroll,
-        search,
-        searchResultClicked,
-        share,
-        signin,
-        signout,
-        signup,
-        sortChanged,
-        subscriptionCanceled,
-        subscriptionChanged,
-        subscriptionPaused,
-        subscriptionRenewed,
-        subscriptionResumed,
-        subscriptionStarted,
-        subscriptionTrialWillEnd,
-        supportChatStarted,
-        supportTicketCreated,
-        supportTicketResolved,
-        surveyCompleted,
-        surveyStarted,
-        trialConverted,
-        trialStarted,
-        videoCompleted,
-        videoPause,
-        videoPlay,
-        videoSeeked,
-        videoStarted,
-        wishlistAdded,
-        wishlistRemoved,
-        workspaceCreated,
-        workspaceDeleted,
-        workspaceJoined,
-        workspaceRoleChanged,
-        workspaceSettingsUpdated,
+  static let addToCart = EventSchema(
+    kind: Pug.Events.addToCart,
+    method: "addToCart",
+    fields: [
+      FieldSchema("productId", .string, required: true),
+      FieldSchema("price", .double),
+      FieldSchema("currency", .string),
+      FieldSchema("cartId", .string),
+      FieldSchema("quantity", .int),
+      FieldSchema("category", .string),
+      FieldSchema("brand", .string),
+      FieldSchema("sku", .string),
     ]
+  )
+  static let apiKeyCreated = EventSchema(
+    kind: Pug.Events.apiKeyCreated,
+    method: "apiKeyCreated",
+    fields: [FieldSchema("apiKeyId", .string), FieldSchema("name", .string), FieldSchema("scope", .string)]
+  )
+  static let apiKeyRevoked = EventSchema(
+    kind: Pug.Events.apiKeyRevoked,
+    method: "apiKeyRevoked",
+    fields: [FieldSchema("apiKeyId", .string), FieldSchema("name", .string), FieldSchema("reason", .string)]
+  )
+  static let appBackgrounded = EventSchema(kind: Pug.Events.appBackgrounded, method: "appBackgrounded")
+  private static let appClose = EventSchema(kind: Pug.Events.appClose, method: "appClose")
+  static let appCrashed = EventSchema(
+    kind: Pug.Events.appCrashed,
+    method: "appCrashed",
+    fields: [FieldSchema("errorMessage", .string), FieldSchema("errorType", .string)]
+  )
+  static let appForegrounded = EventSchema(kind: Pug.Events.appForegrounded, method: "appForegrounded")
+  private static let appInstall = EventSchema(
+    kind: Pug.Events.appInstall,
+    method: "appInstall",
+    fields: [FieldSchema("appVersion", .string), FieldSchema("installSource", .string)]
+  )
+  private static let appOpen = EventSchema(kind: Pug.Events.appOpen, method: "appOpen")
+  private static let appUpdate = EventSchema(
+    kind: Pug.Events.appUpdate,
+    method: "appUpdate",
+    fields: [FieldSchema("appVersion", .string, required: true), FieldSchema("previousVersion", .string)]
+  )
+  static let audioCompleted = EventSchema(
+    kind: Pug.Events.audioCompleted,
+    method: "audioCompleted",
+    fields: [FieldSchema("audioId", .string, required: true)]
+  )
+  static let audioPause = EventSchema(
+    kind: Pug.Events.audioPause,
+    method: "audioPause",
+    fields: [FieldSchema("audioId", .string, required: true), FieldSchema("position", .duration)]
+  )
+  static let audioPlay = EventSchema(
+    kind: Pug.Events.audioPlay,
+    method: "audioPlay",
+    fields: [FieldSchema("audioId", .string, required: true), FieldSchema("position", .duration)]
+  )
+  static let audioSeeked = EventSchema(
+    kind: Pug.Events.audioSeeked,
+    method: "audioSeeked",
+    fields: [
+      FieldSchema("audioId", .string, required: true),
+      FieldSchema("fromPosition", .duration),
+      FieldSchema("toPosition", .duration),
+    ]
+  )
+  static let audioStarted = EventSchema(
+    kind: Pug.Events.audioStarted,
+    method: "audioStarted",
+    fields: [FieldSchema("audioId", .string, required: true)]
+  )
+  static let cartViewed = EventSchema(
+    kind: Pug.Events.cartViewed,
+    method: "cartViewed",
+    fields: [
+      FieldSchema("cartId", .string),
+      FieldSchema("itemCount", .int),
+      FieldSchema("amount", .double),
+      FieldSchema("currency", .string),
+    ]
+  )
+  static let chatArchived = EventSchema(
+    kind: Pug.Events.chatArchived,
+    method: "chatArchived",
+    fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("conversationType", .string)]
+  )
+  static let chatAttachmentDownloaded = EventSchema(
+    kind: Pug.Events.chatAttachmentDownloaded,
+    method: "chatAttachmentDownloaded",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("messageId", .string),
+      FieldSchema("attachmentId", .string, required: true),
+      FieldSchema("attachmentType", .string),
+      FieldSchema("sizeBytes", .int),
+      FieldSchema("threadId", .string),
+    ]
+  )
+  static let chatAttachmentUploaded = EventSchema(
+    kind: Pug.Events.chatAttachmentUploaded,
+    method: "chatAttachmentUploaded",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("messageId", .string),
+      FieldSchema("attachmentId", .string, required: true),
+      FieldSchema("attachmentType", .string),
+      FieldSchema("sizeBytes", .int),
+      FieldSchema("threadId", .string),
+    ]
+  )
+  static let chatCallJoined = EventSchema(
+    kind: Pug.Events.chatCallJoined,
+    method: "chatCallJoined",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("callId", .string, required: true),
+      FieldSchema("callType", .string),
+    ]
+  )
+  static let chatCallLeft = EventSchema(
+    kind: Pug.Events.chatCallLeft,
+    method: "chatCallLeft",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("callId", .string, required: true),
+      FieldSchema("callType", .string),
+      FieldSchema("duration", .duration),
+    ]
+  )
+  static let chatCallRecordingStarted = EventSchema(
+    kind: Pug.Events.chatCallRecordingStarted,
+    method: "chatCallRecordingStarted",
+    fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("callId", .string, required: true)]
+  )
+  static let chatCallScreenShared = EventSchema(
+    kind: Pug.Events.chatCallScreenShared,
+    method: "chatCallScreenShared",
+    fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("callId", .string, required: true)]
+  )
+  static let chatCallStarted = EventSchema(
+    kind: Pug.Events.chatCallStarted,
+    method: "chatCallStarted",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("callId", .string, required: true),
+      FieldSchema("callType", .string),
+    ]
+  )
+  static let chatCreated = EventSchema(
+    kind: Pug.Events.chatCreated,
+    method: "chatCreated",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("conversationType", .string),
+      FieldSchema("participantCount", .int),
+    ]
+  )
+  static let chatDeleted = EventSchema(
+    kind: Pug.Events.chatDeleted,
+    method: "chatDeleted",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("conversationType", .string),
+      FieldSchema("reason", .string),
+    ]
+  )
+  static let chatJoined = EventSchema(
+    kind: Pug.Events.chatJoined,
+    method: "chatJoined",
+    fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("conversationType", .string)]
+  )
+  static let chatLeft = EventSchema(
+    kind: Pug.Events.chatLeft,
+    method: "chatLeft",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("conversationType", .string),
+      FieldSchema("reason", .string),
+    ]
+  )
+  static let chatMemberAdded = EventSchema(
+    kind: Pug.Events.chatMemberAdded,
+    method: "chatMemberAdded",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("memberId", .string, required: true),
+      FieldSchema("role", .string),
+    ]
+  )
+  static let chatMemberMuted = EventSchema(
+    kind: Pug.Events.chatMemberMuted,
+    method: "chatMemberMuted",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("memberId", .string, required: true),
+      FieldSchema("muteDuration", .duration),
+    ]
+  )
+  static let chatMemberRemoved = EventSchema(
+    kind: Pug.Events.chatMemberRemoved,
+    method: "chatMemberRemoved",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("memberId", .string, required: true),
+      FieldSchema("reason", .string),
+    ]
+  )
+  static let chatMemberRoleChanged = EventSchema(
+    kind: Pug.Events.chatMemberRoleChanged,
+    method: "chatMemberRoleChanged",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("memberId", .string, required: true),
+      FieldSchema("previousRole", .string),
+      FieldSchema("newRole", .string, required: true),
+    ]
+  )
+  static let chatMessageDeleted = EventSchema(
+    kind: Pug.Events.chatMessageDeleted,
+    method: "chatMessageDeleted",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("messageId", .string),
+      FieldSchema("conversationType", .string),
+      FieldSchema("reason", .string),
+      FieldSchema("threadId", .string),
+    ]
+  )
+  static let chatMessageEdited = EventSchema(
+    kind: Pug.Events.chatMessageEdited,
+    method: "chatMessageEdited",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("messageId", .string),
+      FieldSchema("conversationType", .string),
+      FieldSchema("threadId", .string),
+    ]
+  )
+  static let chatMessageFailed = EventSchema(
+    kind: Pug.Events.chatMessageFailed,
+    method: "chatMessageFailed",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("messageId", .string),
+      FieldSchema("conversationType", .string),
+      FieldSchema("reason", .string, required: true),
+      FieldSchema("threadId", .string),
+    ]
+  )
+  static let chatMessagePinned = EventSchema(
+    kind: Pug.Events.chatMessagePinned,
+    method: "chatMessagePinned",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("messageId", .string),
+      FieldSchema("conversationType", .string),
+      FieldSchema("threadId", .string),
+    ]
+  )
+  static let chatMessageRead = EventSchema(
+    kind: Pug.Events.chatMessageRead,
+    method: "chatMessageRead",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("messageId", .string),
+      FieldSchema("conversationType", .string),
+      FieldSchema("threadId", .string),
+    ]
+  )
+  static let chatMessageReceived = EventSchema(
+    kind: Pug.Events.chatMessageReceived,
+    method: "chatMessageReceived",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("messageId", .string),
+      FieldSchema("conversationType", .string),
+      FieldSchema("messageType", .string),
+      FieldSchema("characterCount", .int),
+      FieldSchema("attachmentCount", .int),
+      FieldSchema("threadId", .string),
+      FieldSchema("parentMessageId", .string),
+    ]
+  )
+  static let chatMessageSent = EventSchema(
+    kind: Pug.Events.chatMessageSent,
+    method: "chatMessageSent",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("messageId", .string),
+      FieldSchema("conversationType", .string),
+      FieldSchema("messageType", .string),
+      FieldSchema("characterCount", .int),
+      FieldSchema("attachmentCount", .int),
+      FieldSchema("threadId", .string),
+      FieldSchema("parentMessageId", .string),
+    ]
+  )
+  static let chatMessageUnpinned = EventSchema(
+    kind: Pug.Events.chatMessageUnpinned,
+    method: "chatMessageUnpinned",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("messageId", .string),
+      FieldSchema("conversationType", .string),
+      FieldSchema("threadId", .string),
+    ]
+  )
+  static let chatReactionAdded = EventSchema(
+    kind: Pug.Events.chatReactionAdded,
+    method: "chatReactionAdded",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("messageId", .string),
+      FieldSchema("reaction", .string, required: true),
+      FieldSchema("threadId", .string),
+    ]
+  )
+  static let chatReactionRemoved = EventSchema(
+    kind: Pug.Events.chatReactionRemoved,
+    method: "chatReactionRemoved",
+    fields: [
+      FieldSchema("conversationId", .string, required: true),
+      FieldSchema("messageId", .string),
+      FieldSchema("reaction", .string, required: true),
+      FieldSchema("threadId", .string),
+    ]
+  )
+  static let chatTypingStarted = EventSchema(
+    kind: Pug.Events.chatTypingStarted,
+    method: "chatTypingStarted",
+    fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("conversationType", .string)]
+  )
+  static let chatTypingStopped = EventSchema(
+    kind: Pug.Events.chatTypingStopped,
+    method: "chatTypingStopped",
+    fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("conversationType", .string)]
+  )
+  static let chatUnarchived = EventSchema(
+    kind: Pug.Events.chatUnarchived,
+    method: "chatUnarchived",
+    fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("conversationType", .string)]
+  )
+  static let chatUserBlocked = EventSchema(
+    kind: Pug.Events.chatUserBlocked,
+    method: "chatUserBlocked",
+    fields: [FieldSchema("userId", .string, required: true)]
+  )
+  static let checkoutStarted = EventSchema(
+    kind: Pug.Events.checkoutStarted,
+    method: "checkoutStarted",
+    fields: [
+      FieldSchema("productId", .string),
+      FieldSchema("amount", .double),
+      FieldSchema("currency", .string),
+      FieldSchema("cartId", .string),
+      FieldSchema("checkoutId", .string),
+      FieldSchema("itemCount", .int),
+    ]
+  )
+  static let checkoutStepCompleted = EventSchema(
+    kind: Pug.Events.checkoutStepCompleted,
+    method: "checkoutStepCompleted",
+    fields: [
+      FieldSchema("checkoutId", .string, required: true),
+      FieldSchema("step", .string, required: true),
+      FieldSchema("stepIndex", .int),
+    ]
+  )
+  static let couponApplied = EventSchema(
+    kind: Pug.Events.couponApplied,
+    method: "couponApplied",
+    fields: [
+      FieldSchema("couponId", .string, required: true),
+      FieldSchema("couponCode", .string),
+      FieldSchema("cartId", .string),
+      FieldSchema("discountAmount", .double),
+      FieldSchema("currency", .string),
+    ]
+  )
+  static let couponRemoved = EventSchema(
+    kind: Pug.Events.couponRemoved,
+    method: "couponRemoved",
+    fields: [
+      FieldSchema("couponId", .string, required: true),
+      FieldSchema("couponCode", .string),
+      FieldSchema("cartId", .string),
+      FieldSchema("reason", .string),
+    ]
+  )
+  static let emailVerified = EventSchema(kind: Pug.Events.emailVerified, method: "emailVerified")
+  static let errorOccurred = EventSchema(
+    kind: Pug.Events.errorOccurred,
+    method: "errorOccurred",
+    fields: [
+      FieldSchema("errorCode", .string, required: true),
+      FieldSchema("message", .string),
+      FieldSchema("severity", .string),
+      FieldSchema("unhandled", .bool),
+      FieldSchema("stack", .string),
+    ]
+  )
+  static let exportCompleted = EventSchema(
+    kind: Pug.Events.exportCompleted,
+    method: "exportCompleted",
+    fields: [
+      FieldSchema("exportId", .string, required: true),
+      FieldSchema("exportType", .string),
+      FieldSchema("sizeBytes", .int),
+    ]
+  )
+  static let exportStarted = EventSchema(
+    kind: Pug.Events.exportStarted,
+    method: "exportStarted",
+    fields: [FieldSchema("exportId", .string, required: true), FieldSchema("exportType", .string)]
+  )
+  static let featureUsed = EventSchema(
+    kind: Pug.Events.featureUsed,
+    method: "featureUsed",
+    fields: [FieldSchema("featureId", .string, required: true), FieldSchema("featureName", .string)]
+  )
+  static let feedbackSubmitted = EventSchema(
+    kind: Pug.Events.feedbackSubmitted,
+    method: "feedbackSubmitted",
+    fields: [FieldSchema("feedbackId", .string), FieldSchema("category", .string), FieldSchema("comment", .string)]
+  )
+  static let fileDownloaded = EventSchema(
+    kind: Pug.Events.fileDownloaded,
+    method: "fileDownloaded",
+    fields: [
+      FieldSchema("fileId", .string, required: true),
+      FieldSchema("fileName", .string),
+      FieldSchema("fileType", .string),
+      FieldSchema("sizeBytes", .int),
+    ]
+  )
+  static let fileUploaded = EventSchema(
+    kind: Pug.Events.fileUploaded,
+    method: "fileUploaded",
+    fields: [
+      FieldSchema("fileId", .string, required: true),
+      FieldSchema("fileName", .string),
+      FieldSchema("fileType", .string),
+      FieldSchema("sizeBytes", .int),
+    ]
+  )
+  static let filterApplied = EventSchema(
+    kind: Pug.Events.filterApplied,
+    method: "filterApplied",
+    fields: [FieldSchema("key", .string, required: true), FieldSchema("value", .string)]
+  )
+  static let formStart = EventSchema(
+    kind: Pug.Events.formStart,
+    method: "formStart",
+    fields: [FieldSchema("formId", .string, required: true), FieldSchema("formName", .string)]
+  )
+  static let formSubmit = EventSchema(
+    kind: Pug.Events.formSubmit,
+    method: "formSubmit",
+    fields: [
+      FieldSchema("formId", .string, required: true),
+      FieldSchema("formName", .string),
+      FieldSchema("action", .string),
+    ]
+  )
+  static let helpArticleViewed = EventSchema(
+    kind: Pug.Events.helpArticleViewed,
+    method: "helpArticleViewed",
+    fields: [
+      FieldSchema("articleId", .string, required: true),
+      FieldSchema("articleTitle", .string),
+      FieldSchema("category", .string),
+    ]
+  )
+  static let integrationConnected = EventSchema(
+    kind: Pug.Events.integrationConnected,
+    method: "integrationConnected",
+    fields: [FieldSchema("integrationId", .string), FieldSchema("integrationType", .string, required: true)]
+  )
+  static let integrationDisconnected = EventSchema(
+    kind: Pug.Events.integrationDisconnected,
+    method: "integrationDisconnected",
+    fields: [
+      FieldSchema("integrationId", .string),
+      FieldSchema("integrationType", .string, required: true),
+      FieldSchema("reason", .string),
+    ]
+  )
+  static let inviteAccepted = EventSchema(
+    kind: Pug.Events.inviteAccepted,
+    method: "inviteAccepted",
+    fields: [
+      FieldSchema("inviteId", .string),
+      FieldSchema("workspaceId", .string),
+      FieldSchema("inviterId", .string),
+      FieldSchema("inviteeId", .string),
+      FieldSchema("inviteeEmail", .string),
+      FieldSchema("role", .string),
+    ]
+  )
+  static let inviteSent = EventSchema(
+    kind: Pug.Events.inviteSent,
+    method: "inviteSent",
+    fields: [
+      FieldSchema("inviteId", .string),
+      FieldSchema("workspaceId", .string),
+      FieldSchema("inviterId", .string),
+      FieldSchema("inviteeId", .string),
+      FieldSchema("inviteeEmail", .string),
+      FieldSchema("role", .string),
+    ]
+  )
+  static let invoiceFailed = EventSchema(
+    kind: Pug.Events.invoiceFailed,
+    method: "invoiceFailed",
+    fields: [
+      FieldSchema("invoiceId", .string, required: true),
+      FieldSchema("subscriptionId", .string),
+      FieldSchema("amount", .double),
+      FieldSchema("currency", .string),
+      FieldSchema("reason", .string),
+    ]
+  )
+  static let invoicePaid = EventSchema(
+    kind: Pug.Events.invoicePaid,
+    method: "invoicePaid",
+    fields: [
+      FieldSchema("invoiceId", .string, required: true),
+      FieldSchema("subscriptionId", .string),
+      FieldSchema("amount", .double),
+      FieldSchema("currency", .string),
+    ]
+  )
+  static let mfaDisabled = EventSchema(
+    kind: Pug.Events.mfaDisabled,
+    method: "mfaDisabled",
+    fields: [FieldSchema("method", .string)]
+  )
+  static let mfaEnabled = EventSchema(
+    kind: Pug.Events.mfaEnabled,
+    method: "mfaEnabled",
+    fields: [FieldSchema("method", .string)]
+  )
+  static let notificationClicked = EventSchema(
+    kind: Pug.Events.notificationClicked,
+    method: "notificationClicked",
+    fields: [FieldSchema("campaignId", .string, required: true), FieldSchema("notificationType", .string)]
+  )
+  static let notificationDismissed = EventSchema(
+    kind: Pug.Events.notificationDismissed,
+    method: "notificationDismissed",
+    fields: [FieldSchema("campaignId", .string, required: true), FieldSchema("notificationType", .string)]
+  )
+  static let notificationReceived = EventSchema(
+    kind: Pug.Events.notificationReceived,
+    method: "notificationReceived",
+    fields: [FieldSchema("campaignId", .string, required: true), FieldSchema("notificationType", .string)]
+  )
+  static let npsSubmitted = EventSchema(
+    kind: Pug.Events.npsSubmitted,
+    method: "npsSubmitted",
+    fields: [FieldSchema("score", .int), FieldSchema("comment", .string)]
+  )
+  static let orderRefunded = EventSchema(
+    kind: Pug.Events.orderRefunded,
+    method: "orderRefunded",
+    fields: [
+      FieldSchema("orderId", .string, required: true),
+      FieldSchema("amount", .double),
+      FieldSchema("currency", .string),
+      FieldSchema("reason", .string),
+    ]
+  )
+  static let passwordResetCompleted = EventSchema(
+    kind: Pug.Events.passwordResetCompleted,
+    method: "passwordResetCompleted"
+  )
+  static let passwordResetRequested = EventSchema(
+    kind: Pug.Events.passwordResetRequested,
+    method: "passwordResetRequested"
+  )
+  static let paymentFailed = EventSchema(
+    kind: Pug.Events.paymentFailed,
+    method: "paymentFailed",
+    fields: [
+      FieldSchema("paymentId", .string),
+      FieldSchema("invoiceId", .string),
+      FieldSchema("subscriptionId", .string),
+      FieldSchema("amount", .double),
+      FieldSchema("currency", .string),
+      FieldSchema("reason", .string),
+    ]
+  )
+  static let paymentMethodAdded = EventSchema(
+    kind: Pug.Events.paymentMethodAdded,
+    method: "paymentMethodAdded",
+    fields: [FieldSchema("paymentMethodId", .string), FieldSchema("paymentMethodType", .string)]
+  )
+  static let paymentMethodRemoved = EventSchema(
+    kind: Pug.Events.paymentMethodRemoved,
+    method: "paymentMethodRemoved",
+    fields: [FieldSchema("paymentMethodId", .string), FieldSchema("paymentMethodType", .string)]
+  )
+  static let paymentSucceeded = EventSchema(
+    kind: Pug.Events.paymentSucceeded,
+    method: "paymentSucceeded",
+    fields: [
+      FieldSchema("paymentId", .string),
+      FieldSchema("invoiceId", .string),
+      FieldSchema("subscriptionId", .string),
+      FieldSchema("amount", .double),
+      FieldSchema("currency", .string),
+    ]
+  )
+  static let productListViewed = EventSchema(
+    kind: Pug.Events.productListViewed,
+    method: "productListViewed",
+    fields: [
+      FieldSchema("listId", .string, required: true),
+      FieldSchema("listName", .string),
+      FieldSchema("category", .string),
+      FieldSchema("itemCount", .int),
+    ]
+  )
+  static let productViewed = EventSchema(
+    kind: Pug.Events.productViewed,
+    method: "productViewed",
+    fields: [
+      FieldSchema("productId", .string, required: true),
+      FieldSchema("productName", .string),
+      FieldSchema("category", .string),
+      FieldSchema("brand", .string),
+      FieldSchema("sku", .string),
+      FieldSchema("price", .double),
+      FieldSchema("currency", .string),
+    ]
+  )
+  static let purchase = EventSchema(
+    kind: Pug.Events.purchase,
+    method: "purchase",
+    fields: [
+      FieldSchema("productId", .string),
+      FieldSchema("amount", .double),
+      FieldSchema("currency", .string),
+      FieldSchema("orderId", .string),
+      FieldSchema("quantity", .int),
+      FieldSchema("category", .string),
+      FieldSchema("brand", .string),
+      FieldSchema("sku", .string),
+    ]
+  )
+  static let recommendationClicked = EventSchema(
+    kind: Pug.Events.recommendationClicked,
+    method: "recommendationClicked",
+    fields: [
+      FieldSchema("recommendationId", .string, required: true),
+      FieldSchema("itemId", .string, required: true),
+      FieldSchema("source", .string),
+      FieldSchema("index", .int),
+    ]
+  )
+  static let recommendationViewed = EventSchema(
+    kind: Pug.Events.recommendationViewed,
+    method: "recommendationViewed",
+    fields: [
+      FieldSchema("recommendationId", .string, required: true),
+      FieldSchema("itemId", .string),
+      FieldSchema("source", .string),
+      FieldSchema("index", .int),
+    ]
+  )
+  static let refundFailed = EventSchema(
+    kind: Pug.Events.refundFailed,
+    method: "refundFailed",
+    fields: [
+      FieldSchema("orderId", .string, required: true),
+      FieldSchema("refundId", .string),
+      FieldSchema("amount", .double),
+      FieldSchema("currency", .string),
+      FieldSchema("reason", .string),
+    ]
+  )
+  static let removeFromCart = EventSchema(
+    kind: Pug.Events.removeFromCart,
+    method: "removeFromCart",
+    fields: [
+      FieldSchema("productId", .string, required: true),
+      FieldSchema("price", .double),
+      FieldSchema("currency", .string),
+      FieldSchema("cartId", .string),
+      FieldSchema("quantity", .int),
+      FieldSchema("category", .string),
+      FieldSchema("brand", .string),
+      FieldSchema("sku", .string),
+    ]
+  )
+  private static let screenView = EventSchema(
+    kind: Pug.Events.screenView,
+    method: "screenView",
+    fields: [FieldSchema("screenName", .string, required: true), FieldSchema("screenClass", .string)]
+  )
+  static let scroll = EventSchema(
+    kind: Pug.Events.scroll,
+    method: "scroll",
+    fields: [FieldSchema("percent", .int), FieldSchema("scrollY", .int)]
+  )
+  static let search = EventSchema(
+    kind: Pug.Events.search,
+    method: "search",
+    fields: [FieldSchema("query", .string, required: true)]
+  )
+  static let searchResultClicked = EventSchema(
+    kind: Pug.Events.searchResultClicked,
+    method: "searchResultClicked",
+    fields: [
+      FieldSchema("query", .string, required: true),
+      FieldSchema("resultId", .string, required: true),
+      FieldSchema("index", .int),
+    ]
+  )
+  static let share = EventSchema(kind: Pug.Events.share, method: "share")
+  static let signin = EventSchema(kind: Pug.Events.signin, method: "signin")
+  static let signout = EventSchema(kind: Pug.Events.signout, method: "signout")
+  static let signup = EventSchema(kind: Pug.Events.signup, method: "signup")
+  static let sortChanged = EventSchema(
+    kind: Pug.Events.sortChanged,
+    method: "sortChanged",
+    fields: [FieldSchema("key", .string, required: true), FieldSchema("direction", .string)]
+  )
+  static let subscriptionCanceled = EventSchema(
+    kind: Pug.Events.subscriptionCanceled,
+    method: "subscriptionCanceled",
+    fields: [
+      FieldSchema("subscriptionId", .string, required: true),
+      FieldSchema("planId", .string),
+      FieldSchema("reason", .string),
+    ]
+  )
+  static let subscriptionChanged = EventSchema(
+    kind: Pug.Events.subscriptionChanged,
+    method: "subscriptionChanged",
+    fields: [
+      FieldSchema("subscriptionId", .string, required: true),
+      FieldSchema("previousPlanId", .string),
+      FieldSchema("newPlanId", .string),
+    ]
+  )
+  static let subscriptionPaused = EventSchema(
+    kind: Pug.Events.subscriptionPaused,
+    method: "subscriptionPaused",
+    fields: [
+      FieldSchema("subscriptionId", .string, required: true),
+      FieldSchema("planId", .string),
+      FieldSchema("reason", .string),
+    ]
+  )
+  static let subscriptionRenewed = EventSchema(
+    kind: Pug.Events.subscriptionRenewed,
+    method: "subscriptionRenewed",
+    fields: [
+      FieldSchema("subscriptionId", .string, required: true),
+      FieldSchema("planId", .string),
+      FieldSchema("amount", .double),
+      FieldSchema("currency", .string),
+    ]
+  )
+  static let subscriptionResumed = EventSchema(
+    kind: Pug.Events.subscriptionResumed,
+    method: "subscriptionResumed",
+    fields: [
+      FieldSchema("subscriptionId", .string, required: true),
+      FieldSchema("planId", .string),
+      FieldSchema("reason", .string),
+    ]
+  )
+  static let subscriptionStarted = EventSchema(
+    kind: Pug.Events.subscriptionStarted,
+    method: "subscriptionStarted",
+    fields: [
+      FieldSchema("subscriptionId", .string, required: true),
+      FieldSchema("planId", .string),
+      FieldSchema("amount", .double),
+      FieldSchema("currency", .string),
+    ]
+  )
+  static let subscriptionTrialWillEnd = EventSchema(
+    kind: Pug.Events.subscriptionTrialWillEnd,
+    method: "subscriptionTrialWillEnd",
+    fields: [
+      FieldSchema("subscriptionId", .string, required: true),
+      FieldSchema("planId", .string),
+      FieldSchema("trialId", .string),
+    ]
+  )
+  static let supportChatStarted = EventSchema(
+    kind: Pug.Events.supportChatStarted,
+    method: "supportChatStarted",
+    fields: [FieldSchema("conversationId", .string, required: true), FieldSchema("topic", .string)]
+  )
+  static let supportTicketCreated = EventSchema(
+    kind: Pug.Events.supportTicketCreated,
+    method: "supportTicketCreated",
+    fields: [
+      FieldSchema("ticketId", .string, required: true),
+      FieldSchema("category", .string),
+      FieldSchema("priority", .string),
+    ]
+  )
+  static let supportTicketResolved = EventSchema(
+    kind: Pug.Events.supportTicketResolved,
+    method: "supportTicketResolved",
+    fields: [FieldSchema("ticketId", .string, required: true), FieldSchema("resolution", .string)]
+  )
+  static let surveyCompleted = EventSchema(
+    kind: Pug.Events.surveyCompleted,
+    method: "surveyCompleted",
+    fields: [FieldSchema("surveyId", .string, required: true), FieldSchema("questionCount", .int)]
+  )
+  static let surveyStarted = EventSchema(
+    kind: Pug.Events.surveyStarted,
+    method: "surveyStarted",
+    fields: [FieldSchema("surveyId", .string, required: true)]
+  )
+  static let trialConverted = EventSchema(
+    kind: Pug.Events.trialConverted,
+    method: "trialConverted",
+    fields: [FieldSchema("trialId", .string), FieldSchema("subscriptionId", .string), FieldSchema("planId", .string)]
+  )
+  static let trialStarted = EventSchema(
+    kind: Pug.Events.trialStarted,
+    method: "trialStarted",
+    fields: [FieldSchema("trialId", .string), FieldSchema("planId", .string)]
+  )
+  static let videoCompleted = EventSchema(
+    kind: Pug.Events.videoCompleted,
+    method: "videoCompleted",
+    fields: [FieldSchema("videoId", .string, required: true)]
+  )
+  static let videoPause = EventSchema(
+    kind: Pug.Events.videoPause,
+    method: "videoPause",
+    fields: [FieldSchema("videoId", .string, required: true), FieldSchema("position", .duration)]
+  )
+  static let videoPlay = EventSchema(
+    kind: Pug.Events.videoPlay,
+    method: "videoPlay",
+    fields: [FieldSchema("videoId", .string, required: true), FieldSchema("position", .duration)]
+  )
+  static let videoSeeked = EventSchema(
+    kind: Pug.Events.videoSeeked,
+    method: "videoSeeked",
+    fields: [
+      FieldSchema("videoId", .string, required: true),
+      FieldSchema("fromPosition", .duration),
+      FieldSchema("toPosition", .duration),
+    ]
+  )
+  static let videoStarted = EventSchema(
+    kind: Pug.Events.videoStarted,
+    method: "videoStarted",
+    fields: [FieldSchema("videoId", .string, required: true)]
+  )
+  static let wishlistAdded = EventSchema(
+    kind: Pug.Events.wishlistAdded,
+    method: "wishlistAdded",
+    fields: [
+      FieldSchema("productId", .string, required: true),
+      FieldSchema("wishlistId", .string),
+      FieldSchema("price", .double),
+      FieldSchema("currency", .string),
+    ]
+  )
+  static let wishlistRemoved = EventSchema(
+    kind: Pug.Events.wishlistRemoved,
+    method: "wishlistRemoved",
+    fields: [FieldSchema("productId", .string, required: true), FieldSchema("wishlistId", .string)]
+  )
+  static let workspaceCreated = EventSchema(
+    kind: Pug.Events.workspaceCreated,
+    method: "workspaceCreated",
+    fields: [FieldSchema("workspaceId", .string, required: true), FieldSchema("workspaceName", .string)]
+  )
+  static let workspaceDeleted = EventSchema(
+    kind: Pug.Events.workspaceDeleted,
+    method: "workspaceDeleted",
+    fields: [FieldSchema("workspaceId", .string, required: true), FieldSchema("reason", .string)]
+  )
+  static let workspaceJoined = EventSchema(
+    kind: Pug.Events.workspaceJoined,
+    method: "workspaceJoined",
+    fields: [FieldSchema("workspaceId", .string, required: true), FieldSchema("role", .string)]
+  )
+  static let workspaceRoleChanged = EventSchema(
+    kind: Pug.Events.workspaceRoleChanged,
+    method: "workspaceRoleChanged",
+    fields: [
+      FieldSchema("workspaceId", .string, required: true),
+      FieldSchema("memberId", .string, required: true),
+      FieldSchema("previousRole", .string),
+      FieldSchema("newRole", .string, required: true),
+    ]
+  )
+  static let workspaceSettingsUpdated = EventSchema(
+    kind: Pug.Events.workspaceSettingsUpdated,
+    method: "workspaceSettingsUpdated",
+    fields: [FieldSchema("workspaceId", .string, required: true), FieldSchema("setting", .string, required: true)]
+  )
 
-    static let byKind = Dictionary(all.map { ($0.kind, $0) }, uniquingKeysWith: { first, _ in first })
+  static let all = [
+    addToCart,
+    apiKeyCreated,
+    apiKeyRevoked,
+    appBackgrounded,
+    appClose,
+    appCrashed,
+    appForegrounded,
+    appInstall,
+    appOpen,
+    appUpdate,
+    audioCompleted,
+    audioPause,
+    audioPlay,
+    audioSeeked,
+    audioStarted,
+    cartViewed,
+    chatArchived,
+    chatAttachmentDownloaded,
+    chatAttachmentUploaded,
+    chatCallJoined,
+    chatCallLeft,
+    chatCallRecordingStarted,
+    chatCallScreenShared,
+    chatCallStarted,
+    chatCreated,
+    chatDeleted,
+    chatJoined,
+    chatLeft,
+    chatMemberAdded,
+    chatMemberMuted,
+    chatMemberRemoved,
+    chatMemberRoleChanged,
+    chatMessageDeleted,
+    chatMessageEdited,
+    chatMessageFailed,
+    chatMessagePinned,
+    chatMessageRead,
+    chatMessageReceived,
+    chatMessageSent,
+    chatMessageUnpinned,
+    chatReactionAdded,
+    chatReactionRemoved,
+    chatTypingStarted,
+    chatTypingStopped,
+    chatUnarchived,
+    chatUserBlocked,
+    checkoutStarted,
+    checkoutStepCompleted,
+    couponApplied,
+    couponRemoved,
+    emailVerified,
+    errorOccurred,
+    exportCompleted,
+    exportStarted,
+    featureUsed,
+    feedbackSubmitted,
+    fileDownloaded,
+    fileUploaded,
+    filterApplied,
+    formStart,
+    formSubmit,
+    helpArticleViewed,
+    integrationConnected,
+    integrationDisconnected,
+    inviteAccepted,
+    inviteSent,
+    invoiceFailed,
+    invoicePaid,
+    mfaDisabled,
+    mfaEnabled,
+    notificationClicked,
+    notificationDismissed,
+    notificationReceived,
+    npsSubmitted,
+    orderRefunded,
+    passwordResetCompleted,
+    passwordResetRequested,
+    paymentFailed,
+    paymentMethodAdded,
+    paymentMethodRemoved,
+    paymentSucceeded,
+    productListViewed,
+    productViewed,
+    purchase,
+    recommendationClicked,
+    recommendationViewed,
+    refundFailed,
+    removeFromCart,
+    screenView,
+    scroll,
+    search,
+    searchResultClicked,
+    share,
+    signin,
+    signout,
+    signup,
+    sortChanged,
+    subscriptionCanceled,
+    subscriptionChanged,
+    subscriptionPaused,
+    subscriptionRenewed,
+    subscriptionResumed,
+    subscriptionStarted,
+    subscriptionTrialWillEnd,
+    supportChatStarted,
+    supportTicketCreated,
+    supportTicketResolved,
+    surveyCompleted,
+    surveyStarted,
+    trialConverted,
+    trialStarted,
+    videoCompleted,
+    videoPause,
+    videoPlay,
+    videoSeeked,
+    videoStarted,
+    wishlistAdded,
+    wishlistRemoved,
+    workspaceCreated,
+    workspaceDeleted,
+    workspaceJoined,
+    workspaceRoleChanged,
+    workspaceSettingsUpdated,
+  ]
+
+  static let byKind = Dictionary(all.map { ($0.kind, $0) }, uniquingKeysWith: { first, _ in first })
 }

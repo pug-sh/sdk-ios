@@ -6,17 +6,17 @@ import PackageDescription
 // manifest. SwiftLint runs through its command plugin (`make lint`); gen-track writes the typed track
 // API from the event protos (`make typed-track`).
 let package = Package(
-    name: "PugTools",
-    platforms: [.macOS(.v13)],
-    dependencies: [
-        .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins.git", exact: "0.65.1"),
-        // The release the SDK's tests pin, whose protoc writes the descriptor set gen-track reads.
-        .package(url: "https://github.com/apple/swift-protobuf.git", exact: "1.37.0"),
-    ],
-    targets: [
-        .executableTarget(
-            name: "gen-track",
-            dependencies: [.product(name: "SwiftProtobuf", package: "swift-protobuf")]
-        )
-    ]
+  name: "PugTools",
+  platforms: [.macOS(.v13)],
+  dependencies: [
+    .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins.git", exact: "0.65.1"),
+    // The release the SDK's tests pin, whose protoc writes the descriptor set gen-track reads.
+    .package(url: "https://github.com/apple/swift-protobuf.git", exact: "1.37.0"),
+  ],
+  targets: [
+    .executableTarget(
+      name: "gen-track",
+      dependencies: [.product(name: "SwiftProtobuf", package: "swift-protobuf")]
+    )
+  ]
 )

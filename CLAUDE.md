@@ -104,7 +104,7 @@ review the diff. `make check-proto-pin` proves `proto/` matches the pin.
 
 ## Conventions
 
-- swift-format with `.swift-format` (4 spaces, 120 columns). Run `make fmt` before committing.
+- swift-format with `.swift-format` (2 spaces, 120 columns). Run `make fmt` before committing.
 - Every public type is nested in `enum Pug`.
 - No comments that restate code. Comment only a non-obvious why: a protocol quirk, a workaround, a
   deliberate design choice.

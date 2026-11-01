@@ -3,143 +3,143 @@ import Testing
 @testable import Pug
 
 struct InstallTrackerTests {
-    private struct Captured: Equatable {
-        let kind: String
-        let properties: [String: String]
-    }
+  private struct Captured: Equatable {
+    let kind: String
+    let properties: [String: String]
+  }
 
-    private struct Failure: Error {}
+  private struct Failure: Error {}
 
-    private let memory = Pug.MemoryStorage()
-    private let keys = StorageKeys(projectId: "proj_1")
-    private let logger = RecordingLogger()
-    private let captured = Locked<[Captured]>([])
+  private let memory = Pug.MemoryStorage()
+  private let keys = StorageKeys(projectId: "proj_1")
+  private let logger = RecordingLogger()
+  private let captured = Locked<[Captured]>([])
 
-    @Test("the first launch is an install, with its source")
-    func install() {
-        let tracker = makeTracker()
+  @Test("the first launch is an install, with its source")
+  func install() {
+    let tracker = makeTracker()
 
-        tracker.check(appVersion: "1.0") { "com.apple" }
-        tracker.emit(capture)
+    tracker.check(appVersion: "1.0") { "com.apple" }
+    tracker.emit(capture)
 
-        #expect(
-            captured.withLock { $0 } == [
-                Captured(kind: "app_install", properties: ["appVersion": "1.0", "installSource": "com.apple"])
-            ]
+    #expect(
+      captured.withLock { $0 } == [
+        Captured(kind: "app_install", properties: ["appVersion": "1.0", "installSource": "com.apple"])
+      ]
+    )
+    #expect(memory.string(forKey: keys.lastVersion) == "1.0")
+  }
+
+  @Test("a new version is an update from the last one")
+  func update() {
+    memory.setString("1.0", forKey: keys.lastVersion)
+    let tracker = makeTracker()
+
+    tracker.check(appVersion: "1.1", installSource: unread)
+    tracker.emit(capture)
+
+    #expect(
+      captured.withLock { $0 } == [
+        Captured(kind: "app_update", properties: ["appVersion": "1.1", "previousVersion": "1.0"])
+      ]
+    )
+    #expect(memory.string(forKey: keys.lastVersion) == "1.1")
+  }
+
+  @Test("the same version tracks nothing")
+  func sameVersion() {
+    memory.setString("1.0", forKey: keys.lastVersion)
+    let tracker = makeTracker()
+
+    tracker.check(appVersion: "1.0", installSource: unread)
+    tracker.emit(capture)
+
+    #expect(captured.withLock { $0 }.isEmpty)
+  }
+
+  @Test("an app that used Pug before recording versions is not a new install")
+  func earlierActivity() {
+    memory.setString(#"{"anonymousId":"anon-1"}"#, forKey: keys.profile)
+    let tracker = makeTracker()
+
+    tracker.check(appVersion: "1.0", installSource: unread)
+    tracker.emit(capture)
+
+    #expect(captured.withLock { $0 }.isEmpty)
+    #expect(memory.string(forKey: keys.lastVersion) == "1.0")
+  }
+
+  @Test("a stored consent choice is not earlier activity")
+  func consentIsNotActivity() {
+    memory.setString("granted", forKey: keys.consent)
+    memory.setString("", forKey: keys.lastVersion)
+    let tracker = makeTracker()
+
+    tracker.check(appVersion: "1.0") { nil }
+    tracker.emit(capture)
+
+    #expect(captured.withLock { $0 } == [Captured(kind: "app_install", properties: ["appVersion": "1.0"])])
+  }
+
+  @Test("an event consent kept back waits for the next emit")
+  func heldBack() {
+    let tracker = makeTracker()
+    tracker.check(appVersion: "1.0") { nil }
+
+    tracker.emit { _, _ in false }
+    #expect(memory.string(forKey: keys.lastVersion) == nil)
+    tracker.emit(capture)
+    tracker.emit(capture)
+
+    #expect(captured.withLock { $0 }.map(\.kind) == ["app_install"])
+    #expect(memory.string(forKey: keys.lastVersion) == "1.0")
+  }
+
+  @Test("without an app version nothing is tracked")
+  func noAppVersion() {
+    let tracker = makeTracker()
+
+    tracker.check(appVersion: nil, installSource: unread)
+    tracker.check(appVersion: "", installSource: unread)
+    tracker.emit(capture)
+
+    #expect(captured.withLock { $0 }.isEmpty)
+    #expect(memory.string(forKey: keys.lastVersion) == nil)
+    #expect(
+      logger.debugs
+        == Array(
+          repeating: "app_install and app_update are not tracked: the app version could not be read",
+          count: 2
         )
-        #expect(memory.string(forKey: keys.lastVersion) == "1.0")
-    }
+    )
+  }
 
-    @Test("a new version is an update from the last one")
-    func update() {
-        memory.setString("1.0", forKey: keys.lastVersion)
-        let tracker = makeTracker()
+  @Test("storage that could not be read tracks no install, since every launch would look like one")
+  func failedStorage() {
+    let tracker = InstallTracker(
+      storage: SafeStorage(ThrowingStorage(Failure()), logger: logger.safe()),
+      keys: keys,
+      logger: logger.safe()
+    )
 
-        tracker.check(appVersion: "1.1", installSource: unread)
-        tracker.emit(capture)
+    tracker.check(appVersion: "1.0", installSource: unread)
+    tracker.emit(capture)
 
-        #expect(
-            captured.withLock { $0 } == [
-                Captured(kind: "app_update", properties: ["appVersion": "1.1", "previousVersion": "1.0"])
-            ]
-        )
-        #expect(memory.string(forKey: keys.lastVersion) == "1.1")
-    }
+    #expect(captured.withLock { $0 }.isEmpty)
+    #expect(logger.debugs == ["app_install and app_update are not tracked: storage could not be read"])
+  }
 
-    @Test("the same version tracks nothing")
-    func sameVersion() {
-        memory.setString("1.0", forKey: keys.lastVersion)
-        let tracker = makeTracker()
+  private func makeTracker() -> InstallTracker {
+    InstallTracker(storage: SafeStorage(memory, logger: logger.safe()), keys: keys, logger: logger.safe())
+  }
 
-        tracker.check(appVersion: "1.0", installSource: unread)
-        tracker.emit(capture)
+  private func unread() -> String? {
+    Issue.record("the install source was read")
+    return nil
+  }
 
-        #expect(captured.withLock { $0 }.isEmpty)
-    }
-
-    @Test("an app that used Pug before recording versions is not a new install")
-    func earlierActivity() {
-        memory.setString(#"{"anonymousId":"anon-1"}"#, forKey: keys.profile)
-        let tracker = makeTracker()
-
-        tracker.check(appVersion: "1.0", installSource: unread)
-        tracker.emit(capture)
-
-        #expect(captured.withLock { $0 }.isEmpty)
-        #expect(memory.string(forKey: keys.lastVersion) == "1.0")
-    }
-
-    @Test("a stored consent choice is not earlier activity")
-    func consentIsNotActivity() {
-        memory.setString("granted", forKey: keys.consent)
-        memory.setString("", forKey: keys.lastVersion)
-        let tracker = makeTracker()
-
-        tracker.check(appVersion: "1.0") { nil }
-        tracker.emit(capture)
-
-        #expect(captured.withLock { $0 } == [Captured(kind: "app_install", properties: ["appVersion": "1.0"])])
-    }
-
-    @Test("an event consent kept back waits for the next emit")
-    func heldBack() {
-        let tracker = makeTracker()
-        tracker.check(appVersion: "1.0") { nil }
-
-        tracker.emit { _, _ in false }
-        #expect(memory.string(forKey: keys.lastVersion) == nil)
-        tracker.emit(capture)
-        tracker.emit(capture)
-
-        #expect(captured.withLock { $0 }.map(\.kind) == ["app_install"])
-        #expect(memory.string(forKey: keys.lastVersion) == "1.0")
-    }
-
-    @Test("without an app version nothing is tracked")
-    func noAppVersion() {
-        let tracker = makeTracker()
-
-        tracker.check(appVersion: nil, installSource: unread)
-        tracker.check(appVersion: "", installSource: unread)
-        tracker.emit(capture)
-
-        #expect(captured.withLock { $0 }.isEmpty)
-        #expect(memory.string(forKey: keys.lastVersion) == nil)
-        #expect(
-            logger.debugs
-                == Array(
-                    repeating: "app_install and app_update are not tracked: the app version could not be read",
-                    count: 2
-                )
-        )
-    }
-
-    @Test("storage that could not be read tracks no install, since every launch would look like one")
-    func failedStorage() {
-        let tracker = InstallTracker(
-            storage: SafeStorage(ThrowingStorage(Failure()), logger: logger.safe()),
-            keys: keys,
-            logger: logger.safe()
-        )
-
-        tracker.check(appVersion: "1.0", installSource: unread)
-        tracker.emit(capture)
-
-        #expect(captured.withLock { $0 }.isEmpty)
-        #expect(logger.debugs == ["app_install and app_update are not tracked: storage could not be read"])
-    }
-
-    private func makeTracker() -> InstallTracker {
-        InstallTracker(storage: SafeStorage(memory, logger: logger.safe()), keys: keys, logger: logger.safe())
-    }
-
-    private func unread() -> String? {
-        Issue.record("the install source was read")
-        return nil
-    }
-
-    private func capture(_ kind: String, _ properties: [String: String]) -> Bool {
-        captured.withLock { $0.append(Captured(kind: kind, properties: properties)) }
-        return true
-    }
+  private func capture(_ kind: String, _ properties: [String: String]) -> Bool {
+    captured.withLock { $0.append(Captured(kind: kind, properties: properties)) }
+    return true
+  }
 }
