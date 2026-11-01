@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # swift-protobuf is test-only and pinned to 1.37, the last release Swift 6.0 can load: 1.38 and
+  # later need Swift 6.1, so they wait until the Xcode 16.0 floor moves.
+  - package-ecosystem: "swift"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "github.com/apple/swift-protobuf"
+        versions: [">= 1.38.0"]
+
+  - package-ecosystem: "swift"
+    directory: "/Tools"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

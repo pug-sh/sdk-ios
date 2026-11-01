@@ -1,0 +1,39 @@
+# swift-format (.swift-format) owns the layout. SwiftLint enforces what keeps the SDK from trapping,
+# since a trap in an SDK crashes the host app and Swift cannot catch it.
+only_rules:
+  - custom_rules
+  - force_cast
+  - force_try
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+
+force_cast: error
+force_try: error
+force_unwrapping: error
+implicitly_unwrapped_optional: error
+
+# Matched outside comments and strings rather than on one syntax kind: `unowned` in a capture list
+# is not classified as a keyword.
+custom_rules:
+  fatal_error:
+    name: "fatalError"
+    regex: '\bfatalError\s*\('
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "fatalError traps the host app: log and recover instead."
+    severity: error
+  precondition:
+    name: "precondition"
+    regex: '\bprecondition(Failure)?\s*\('
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "precondition traps in release builds too: log and recover instead."
+    severity: error
+  unowned:
+    name: "unowned"
+    regex: '\bunowned\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "unowned traps once the referent is gone: use weak."
+    severity: error
+
+excluded:
+  - .build
+  - Tools/.build
