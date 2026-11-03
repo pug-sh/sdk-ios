@@ -59,6 +59,7 @@ final class ClientPlatformTests {
   func openAndClose() throws {
     let platform = FakePlatform()
     _ = try makeClient(platform) { $0.batchMaxSize = 1 }
+    #expect(platform.observesScreens == true)
 
     platform.foreground()
     platform.foreground()
@@ -237,6 +238,57 @@ final class ClientPlatformTests {
     #expect(transport.kinds == [["screen_view"]])
   }
 
+  @Test("a view controller back with no screen in between is the same screen, and keeps the name screen gave it")
+  func returningScreen() throws {
+    let platform = FakePlatform()
+    let client = try makeClient(platform) { $0.batchMaxSize = 1 }
+
+    platform.showScreen("Shop.HomeViewController")
+    client.screen("Home")
+    // Covered by a full-screen controller that is not a screen, such as a photo picker.
+    platform.hideScreen()
+    platform.showScreen("Shop.HomeViewController", returning: true)
+    client.track("tap", properties: nil, options: nil)
+    scheduler.runCurrent()
+
+    #expect(transport.kinds.flatMap { $0 } == ["screen_view", "screen_view", "tap"])
+    let tap = try #require(try transport.batches.last?.single())
+    #expect(tap.autoProperties["$url"] == .string("Home"))
+    #expect(tap.autoProperties["$referrer"] == .string("HomeViewController"))
+  }
+
+  @Test("a view controller back after another screen became current is a screen again")
+  func returningAfterAnotherScreen() throws {
+    let platform = FakePlatform()
+    let client = try makeClient(platform) { $0.batchMaxSize = 1 }
+
+    platform.showScreen("Shop.HomeViewController")
+    platform.hideScreen()
+    // A SwiftUI screen over it, named by the app.
+    client.screen("Paywall")
+    platform.showScreen("Shop.HomeViewController", returning: true)
+    scheduler.runCurrent()
+
+    let names = try transport.batches.map { try $0.single().customProperties["screenName"] }
+    #expect(names == [.string("HomeViewController"), .string("Paywall"), .string("HomeViewController")])
+    #expect(try transport.batches.last?.single().autoProperties["$referrer"] == .string("Paywall"))
+  }
+
+  @Test("a view controller that appears again without having gone, as when a swipe back is cancelled, is no new screen")
+  func returningWithoutLeaving() throws {
+    let platform = FakePlatform()
+    let client = try makeClient(platform) { $0.batchMaxSize = 1 }
+
+    platform.showScreen("Shop.DetailViewController")
+    client.screen("Item 42")
+    platform.showScreen("Shop.DetailViewController", returning: true)
+    client.track("tap", properties: nil, options: nil)
+    scheduler.runCurrent()
+
+    #expect(transport.kinds.flatMap { $0 } == ["screen_view", "screen_view", "tap"])
+    #expect(try transport.batches.last?.single().autoProperties["$url"] == .string("Item 42"))
+  }
+
   @Test("screen names screens of its own")
   func namedScreen() throws {
     let client = try makeClient { $0.batchMaxSize = 1 }
@@ -260,9 +312,11 @@ final class ClientPlatformTests {
 
     client.screen("Feed")
     platform.showScreen("Shop.MainViewController")
+    platform.hideScreen()
     client.track("tap", properties: nil, options: nil)
     scheduler.runCurrent()
 
+    #expect(platform.observesScreens == false)
     #expect(transport.kinds.flatMap { $0 } == ["screen_view", "tap"])
     #expect(try transport.batches.last?.single().autoProperties["$url"] == .string("Feed"))
   }
@@ -358,6 +412,17 @@ final class ClientPlatformTests {
 
     #expect(transport.batches.isEmpty)
     #expect(storage.string(forKey: keys.lastVersion) == nil)
+  }
+
+  @Test("an app extension, which has a container of its own, tracks no install")
+  func appExtension() throws {
+    _ = try makeClient(FakePlatform(appVersion: "1.0", appExtension: true)) { $0.batchMaxSize = 1 }
+
+    scheduler.runCurrent()
+
+    #expect(transport.batches.isEmpty)
+    #expect(storage.string(forKey: keys.lastVersion) == nil)
+    #expect(logger.debugs.contains("app_install and app_update are not tracked in an app extension"))
   }
 
   @Test("an initialize after destroy does not track the install again")
@@ -463,6 +528,71 @@ final class ClientPlatformTests {
     #expect(logger.warnings == ["No storage directory is available; state is kept in memory until the app restarts"])
   }
 
+  @Test("files that cannot be read before the first unlock are waited for, and the calls made meanwhile with them")
+  func waitsForUnlock() throws {
+    let directory = root.appendingPathComponent("pug")
+    let previous = try storeQueuedEvent(in: directory)
+    let queue = directory.appendingPathComponent(FileStorage.fileName(keys.queue))
+    let unreadable = try makeUnreadable(queue)
+    let platform = FakePlatform(directory: directory, locked: true)
+    let client = try makeClient(platform, after: previous.teardown) {
+      $0.storage = nil
+      $0.batchMaxSize = 2
+    }
+
+    client.track("b", properties: nil, options: nil)
+    scheduler.runCurrent()
+    #expect(platform.isWaitingForProtectedData)
+    #expect(transport.batches.count == 1)
+    try unreadable.restore()
+    platform.unlock()
+    scheduler.runCurrent()
+
+    let events = try #require(transport.batches.last)
+    #expect(events.map(\.kind) == ["a", "b"])
+    #expect(Set(events.map(\.distinctId)).count == 1)
+    #expect(client.trackingConsent == .granted)
+    #expect(!logger.warnings.contains { $0.hasPrefix("Storage failed") })
+  }
+
+  @Test("files still unreadable once the device is unlocked move the client to memory")
+  func unreadableAfterUnlock() throws {
+    let directory = root.appendingPathComponent("pug")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    _ = try makeUnreadable(directory.appendingPathComponent(FileStorage.fileName(keys.queue)))
+    let platform = FakePlatform(directory: directory, locked: true)
+    let client = try makeClient(platform) {
+      $0.storage = nil
+      $0.batchMaxSize = 1
+    }
+
+    client.track("b", properties: nil, options: nil)
+    scheduler.runCurrent()
+    platform.unlock()
+    scheduler.runCurrent()
+
+    #expect(transport.kinds == [["b"]])
+    #expect(logger.warnings == ["Storage failed; state is kept in memory only until the app restarts"])
+  }
+
+  @Test("a destroy while start waits for the unlock finishes after it")
+  func destroyWhileLocked() throws {
+    let directory = root.appendingPathComponent("pug")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let unreadable = try makeUnreadable(directory.appendingPathComponent(FileStorage.fileName(keys.queue)))
+    let platform = FakePlatform(directory: directory, locked: true)
+    let client = try makeClient(platform) { $0.storage = nil }
+
+    client.destroy()
+    scheduler.runCurrent()
+    #expect(!client.teardown.isFinished)
+    try unreadable.restore()
+    platform.unlock()
+    scheduler.runCurrent()
+
+    #expect(client.teardown.isFinished)
+  }
+
   @Test("destroy stops observing the lifecycle, and later callbacks are ignored")
   func destroyStopsObserving() throws {
     let platform = FakePlatform()
@@ -527,10 +657,45 @@ final class ClientPlatformTests {
     return client
   }
 
+  /// Leaves an undelivered event "a" in `directory`, as an earlier launch would, and returns its client.
+  private func storeQueuedEvent(in directory: URL) throws -> Client {
+    transport.batchFailure = .unavailable
+    let client = try makeClient(FakePlatform(directory: directory)) { $0.storage = nil }
+    client.track("a", properties: nil, options: nil)
+    client.destroy()
+    scheduler.runCurrent()
+    transport.batchFailure = nil
+    return client
+  }
+
+  /// Puts a directory where `file` is, which reads fail on as they do on a protected file, until `restore()`.
+  private func makeUnreadable(_ file: URL) throws -> UnreadableFile {
+    let fileManager = FileManager.default
+    let aside = file.appendingPathExtension("aside")
+    if fileManager.fileExists(atPath: file.path) {
+      try fileManager.moveItem(at: file, to: aside)
+    }
+    try fileManager.createDirectory(at: file, withIntermediateDirectories: true)
+    return UnreadableFile(file: file, aside: aside)
+  }
+
   private func storedKinds(_ directory: URL) throws -> [String] {
     let file = directory.appendingPathComponent(FileStorage.fileName(keys.queue))
     guard FileManager.default.fileExists(atPath: file.path) else { return [] }
     let array = try #require(StoredJSON.parse(try String(contentsOf: file, encoding: .utf8)) as? [Any])
     return try array.map { try #require(EventJSON.decode($0)).kind }
+  }
+}
+
+private struct UnreadableFile {
+  let file: URL
+  let aside: URL
+
+  func restore() throws {
+    let fileManager = FileManager.default
+    try fileManager.removeItem(at: file)
+    if fileManager.fileExists(atPath: aside.path) {
+      try fileManager.moveItem(at: aside, to: file)
+    }
   }
 }

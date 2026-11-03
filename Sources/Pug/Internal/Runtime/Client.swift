@@ -178,11 +178,27 @@ final class Client: Sendable {
   }
 
   private func restore(startTime: Int64) {
+    let (primary, files) = ClientCore.storage(configuration: configuration, platform: platform, scheduler: scheduler)
+    let keys = StorageKeys(projectId: configuration.projectId)
+    // Files that exist but cannot be read, as before the first unlock after a reboot, are waited for: in memory, this
+    // process would track the user as someone new. The calls made meanwhile wait in the op queue.
+    if let files, !files.canRead(keys.all) {
+      platform.whenProtectedDataAvailable(logger: logger) { [self] in
+        scheduler.run { [self] in restore(startTime: startTime, primary: primary, files: files) }
+      }
+    } else {
+      restore(startTime: startTime, primary: primary, files: files)
+    }
+  }
+
+  private func restore(startTime: Int64, primary: any Pug.Storage, files: FileStorage?) {
     let core = ClientCore(
       configuration: configuration,
       transport: transport,
       scheduler: scheduler,
       platform: platform,
+      primary: primary,
+      fileStorage: files,
       ids: ids,
       random: random,
       propertyMapper: propertyMapper,
@@ -278,7 +294,7 @@ final class Client: Sendable {
 
   // A destroy() on another thread can come before this, and must still stop what this starts.
   private func observeLifecycle() {
-    let handle = platform.observeLifecycle(self, logger: logger)
+    let handle = platform.observeLifecycle(self, screens: configuration.autoScreenViews, logger: logger)
     if handle == nil {
       logger.debug("App open, close and screen events are not tracked: there is no app lifecycle to observe")
     }
@@ -317,9 +333,16 @@ extension Client: LifecycleObserver {
     }
   }
 
-  func screenDidAppear(name: String, screenClass: String) {
+  func screenDidAppear(name: String, screenClass: String, isReturning: Bool) {
     guard configuration.autoScreenViews else { return }
     let now = clock.nowMillis
-    enqueue("Tracking a screen view") { $0.showScreen(name, screenClass: screenClass, at: now) }
+    enqueue("Tracking a screen view") {
+      $0.showAutoScreen(name, screenClass: screenClass, isReturning: isReturning, at: now)
+    }
+  }
+
+  func screenDidDisappear() {
+    guard configuration.autoScreenViews else { return }
+    enqueue("Tracking a screen leaving") { $0.hideAutoScreen() }
   }
 }

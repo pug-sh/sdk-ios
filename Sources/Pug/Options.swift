@@ -45,7 +45,8 @@ extension Pug {
     /// Tracks `app_open` and `app_close` as the app comes to the foreground and leaves it.
     public var autoOpenCloseEvents = true
 
-    /// Tracks a `screen_view` each time one of the app's view controllers appears on a different screen.
+    /// Tracks a `screen_view` each time one of the app's own view controllers appears on a different screen. SwiftUI
+    /// screens are named with `Pug.screen(_:)`.
     public var autoScreenViews = true
 
     /// Tracks `app_install` and `app_update` on the first launch of each app version.

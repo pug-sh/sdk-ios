@@ -8,8 +8,11 @@ final class FakePlatform: Platform {
   private struct State: Sendable {
     var observer: (any LifecycleObserver)?
     var isObserving = false
+    var observesScreens: Bool?
     var mainThread: [@MainActor @Sendable () -> Void] = []
     var installSourceReads = 0
+    var isProtectedDataAvailable: Bool
+    var protectedDataWaiters: [@Sendable () -> Void] = []
   }
 
   private struct FixedProperties: AutoProperties {
@@ -39,16 +42,20 @@ final class FakePlatform: Platform {
   private let source: String?
   private let isObservable: Bool
   private let runsMainAtOnce: Bool
-  private let state = Locked(State())
+  private let state: Locked<State>
+  let isAppExtension: Bool
 
-  /// `runsMainAtOnce` runs main-thread work as it is posted, for tests on the main actor.
+  /// `runsMainAtOnce` runs main-thread work as it is posted, for tests on the main actor. `locked` keeps protected
+  /// data unavailable until `unlock()`.
   init(
     directory: URL? = nil,
     properties: [String: any Sendable] = [:],
     appVersion: String? = nil,
     installSource: String? = nil,
     observable: Bool = true,
-    runsMainAtOnce: Bool = false
+    runsMainAtOnce: Bool = false,
+    appExtension: Bool = false,
+    locked: Bool = false
   ) {
     self.directory = directory
     self.properties = properties
@@ -56,10 +63,21 @@ final class FakePlatform: Platform {
     source = installSource
     isObservable = observable
     self.runsMainAtOnce = runsMainAtOnce
+    isAppExtension = appExtension
+    state = Locked(State(isProtectedDataAvailable: !locked))
   }
 
   var isObserving: Bool {
     state.withLock { $0.isObserving }
+  }
+
+  /// Whether the client asked for view controllers, nil until it observes.
+  var observesScreens: Bool? {
+    state.withLock { $0.observesScreens }
+  }
+
+  var isWaitingForProtectedData: Bool {
+    state.withLock { !$0.protectedDataWaiters.isEmpty }
   }
 
   var installSourceReads: Int {
@@ -68,6 +86,18 @@ final class FakePlatform: Platform {
 
   func storageDirectory() -> URL? {
     directory
+  }
+
+  func whenProtectedDataAvailable(logger: SafeLogger, _ work: @escaping @Sendable () -> Void) {
+    let isAvailable = state.withLock { state in
+      if !state.isProtectedDataAvailable {
+        state.protectedDataWaiters.append(work)
+      }
+      return state.isProtectedDataAvailable
+    }
+    if isAvailable {
+      work()
+    }
   }
 
   func autoProperties(logger: SafeLogger) -> any AutoProperties {
@@ -79,11 +109,12 @@ final class FakePlatform: Platform {
     return source
   }
 
-  func observeLifecycle(_ observer: any LifecycleObserver, logger: SafeLogger) -> (any Cancellable)? {
+  func observeLifecycle(_ observer: any LifecycleObserver, screens: Bool, logger: SafeLogger) -> (any Cancellable)? {
     guard isObservable else { return nil }
     state.withLock { state in
       state.observer = observer
       state.isObserving = true
+      state.observesScreens = screens
     }
     return Observation(self)
   }
@@ -112,10 +143,28 @@ final class FakePlatform: Platform {
     observer()?.appDidEnterBackground(then: settled)
   }
 
-  /// A view controller of `screenClass`, module-qualified as `NSStringFromClass` names it, appears.
-  func showScreen(_ screenClass: String) {
+  /// A view controller of `screenClass`, module-qualified as `NSStringFromClass` names it, appears: `returning` when
+  /// it is the one that appeared last.
+  func showScreen(_ screenClass: String, returning: Bool = false) {
     let name = screenClass.split(separator: ".").last.map(String.init) ?? screenClass
-    observer()?.screenDidAppear(name: name, screenClass: screenClass)
+    observer()?.screenDidAppear(name: name, screenClass: screenClass, isReturning: returning)
+  }
+
+  /// The view controller that appeared last disappears.
+  func hideScreen() {
+    observer()?.screenDidDisappear()
+  }
+
+  /// The device is unlocked: protected data becomes available.
+  func unlock() {
+    let waiters = state.withLock { state in
+      defer { state.protectedDataWaiters = [] }
+      state.isProtectedDataAvailable = true
+      return state.protectedDataWaiters
+    }
+    for waiter in waiters {
+      waiter()
+    }
   }
 
   private func observer() -> (any LifecycleObserver)? {

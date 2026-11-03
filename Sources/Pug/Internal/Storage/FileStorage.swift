@@ -10,6 +10,13 @@ final class FileStorage: Pug.Storage, @unchecked Sendable {
   // Well under the 255-byte name limit of Apple's file systems.
   private static let maxFileNameLength = 128
   private static let tempSuffix = ".tmp"
+  #if os(iOS) && !targetEnvironment(macCatalyst)
+  // The default for an app's files, explicit for an app whose own default is stronger: Pug also runs in the
+  // background while the device is locked.
+  private static let writingOptions: Data.WritingOptions = .completeFileProtectionUntilFirstUserAuthentication
+  #else
+  private static let writingOptions: Data.WritingOptions = []
+  #endif
 
   private let directory: URL
   private let logger: SafeLogger
@@ -19,6 +26,7 @@ final class FileStorage: Pug.Storage, @unchecked Sendable {
   private var unsynced: Set<String> = []
   private var scheduledSync: (any Cancellable)?
   private var failing = false
+  private var isDirectoryExcluded = false
 
   init(directory: URL, logger: SafeLogger, scheduler: any Scheduler) {
     self.directory = directory
@@ -43,6 +51,18 @@ final class FileStorage: Pug.Storage, @unchecked Sendable {
     }
     values.updateValue(value, forKey: key)
     return value
+  }
+
+  /// Whether every one of `keys` can be read now. What it reads is kept, as by `string(forKey:)`.
+  func canRead(_ keys: [String]) -> Bool {
+    do {
+      for key in keys {
+        _ = try string(forKey: key)
+      }
+      return true
+    } catch {
+      return false
+    }
   }
 
   func setString(_ value: String, forKey key: String) {
@@ -117,8 +137,9 @@ final class FileStorage: Pug.Storage, @unchecked Sendable {
       return
     }
     try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    excludeDirectoryFromBackup()
     let temp = directory.appendingPathComponent(Self.fileName(key) + Self.tempSuffix, isDirectory: false)
-    try Data(value.utf8).write(to: temp)
+    try Data(value.utf8).write(to: temp, options: Self.writingOptions)
     // The rename must not publish a file whose content a power loss could still undo.
     do {
       let handle = try FileHandle(forWritingTo: temp)
@@ -128,6 +149,22 @@ final class FileStorage: Pug.Storage, @unchecked Sendable {
     guard rename(temp.path, file.path) == 0 else {
       throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
     }
+  }
+
+  // A backup restored onto another device would make two installs one user.
+  private func excludeDirectoryFromBackup() {
+    guard !isDirectoryExcluded else { return }
+    isDirectoryExcluded = true
+    #if canImport(Darwin)
+    var url = directory
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = true
+    do {
+      try url.setResourceValues(values)
+    } catch {
+      logger.warning("The storage directory could not be excluded from backups", error: error)
+    }
+    #endif
   }
 
   private func report(_ failure: (any Error)?) {

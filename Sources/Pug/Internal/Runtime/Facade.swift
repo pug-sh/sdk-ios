@@ -9,7 +9,11 @@ final class Facade: TypedTracking {
   /// What `Pug` calls. Its clients share one worker, so two never touch storage at once.
   static let shared: Facade = {
     let scheduler = DispatchScheduler()
-    let platform = FoundationPlatform()
+    #if os(iOS)
+    let platform: any Platform = UIKitPlatform()
+    #else
+    let platform: any Platform = FoundationPlatform()
+    #endif
     return Facade(fallbackLogger: SafeLogger(SystemLogger(), isDebugEnabled: false)) { configuration in
       Client(
         configuration: configuration,

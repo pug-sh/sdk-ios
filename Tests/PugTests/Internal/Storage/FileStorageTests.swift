@@ -148,6 +148,20 @@ final class FileStorageTests {
     #expect(try storage.string(forKey: Self.otherKey) == nil)
   }
 
+  @Test("canRead reads each key, keeping what it read, and fails on a file that cannot be read")
+  func canRead() throws {
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try Data("v1".utf8).write(to: file(Self.key))
+    let storage = makeStorage()
+
+    #expect(storage.canRead([Self.key, Self.otherKey]))
+    try FileManager.default.removeItem(at: file(Self.key))
+    #expect(try storage.string(forKey: Self.key) == "v1")
+
+    try FileManager.default.createDirectory(at: file(Self.key), withIntermediateDirectories: true)
+    #expect(!makeStorage().canRead([Self.otherKey, Self.key]))
+  }
+
   @Test("an unreadable file moves the client to memory and leaves the files as they were")
   func unreadableFileFailsOver() throws {
     try FileManager.default.createDirectory(at: file(Self.key), withIntermediateDirectories: true)

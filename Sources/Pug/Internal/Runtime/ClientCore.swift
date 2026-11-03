@@ -27,12 +27,37 @@ final class ClientCore: @unchecked Sendable {
   private var screen: String?
   private var screenClass: String?
   private var previousScreen: String?
+  // Whether the view controller that set the screen last has disappeared, and whether another screen became current
+  // while it was away. Back with none in between, it is the same screen, and a name screen() gave it stays current.
+  private var isAutoScreenHidden = false
+  private var isAutoScreenReplaced = false
 
+  /// The storage `configuration` asks for: the host's, else files in the platform's directory, else memory.
+  static func storage(
+    configuration: Configuration,
+    platform: any Platform,
+    scheduler: any Scheduler
+  ) -> (primary: any Pug.Storage, files: FileStorage?) {
+    if let storage = configuration.storage {
+      return (storage, nil)
+    }
+    guard let directory = platform.storageDirectory() else {
+      configuration.logger.warning(
+        "No storage directory is available; state is kept in memory until the app restarts")
+      return (Pug.MemoryStorage(), nil)
+    }
+    let files = FileStorage(directory: directory, logger: configuration.logger, scheduler: scheduler)
+    return (files, files)
+  }
+
+  /// `primary` and `fileStorage` come from `storage(configuration:platform:scheduler:)`.
   init(
     configuration: Configuration,
     transport: any Transport,
     scheduler: any Scheduler,
     platform: any Platform,
+    primary: any Pug.Storage,
+    fileStorage: FileStorage?,
     ids: any IdGenerator,
     random: @escaping @Sendable () -> Double,
     propertyMapper: PropertyMapper,
@@ -41,18 +66,6 @@ final class ClientCore: @unchecked Sendable {
     assert(scheduler.isOnWorker)
     let logger = configuration.logger
     let keys = StorageKeys(projectId: configuration.projectId)
-    var fileStorage: FileStorage?
-    let primary: any Pug.Storage
-    if let storage = configuration.storage {
-      primary = storage
-    } else if let directory = platform.storageDirectory() {
-      let files = FileStorage(directory: directory, logger: logger, scheduler: scheduler)
-      fileStorage = files
-      primary = files
-    } else {
-      logger.warning("No storage directory is available; state is kept in memory until the app restarts")
-      primary = Pug.MemoryStorage()
-    }
     let storage = SafeStorage(primary, logger: logger)
     // Read first, while a failed read can only mean a stored choice that cannot be read: the controller denies it,
     // as it may be an opt-out, and install detection is skipped.
@@ -65,8 +78,11 @@ final class ClientCore: @unchecked Sendable {
     )
     let autoProperties = platform.autoProperties(logger: logger)
     let installs = InstallTracker(storage: storage, keys: keys, logger: logger)
-    // Before anything this launch writes, so the probe for earlier launches sees only theirs.
-    if configuration.autoInstallEvents {
+    // Before anything this launch writes, so the probe for earlier launches sees only theirs. An extension has a
+    // container of its own, where each would look like a new install.
+    if configuration.autoInstallEvents, platform.isAppExtension {
+      logger.debug("app_install and app_update are not tracked in an app extension")
+    } else if configuration.autoInstallEvents {
       installs.check(appVersion: autoProperties.appVersion, installSource: platform.installSource)
     }
     let identity = Identity(
@@ -221,10 +237,31 @@ final class ClientCore: @unchecked Sendable {
       logger.debug("A screen view was not tracked: the screen is the current one")
       return
     }
+    if isAutoScreenHidden {
+      isAutoScreenReplaced = true
+    }
     previousScreen = screen
     screen = shown
     self.screenClass = screenClass
     captureScreenView(shown, screenClass: screenClass, at: callTime)
+  }
+
+  func showAutoScreen(_ name: String, screenClass: String, isReturning: Bool, at callTime: Int64) {
+    assert(scheduler.isOnWorker)
+    defer {
+      isAutoScreenHidden = false
+      isAutoScreenReplaced = false
+    }
+    if isReturning, !isAutoScreenReplaced {
+      logger.debug("A screen view was not tracked: its view controller is back on the current screen")
+      return
+    }
+    showScreen(name, screenClass: screenClass, at: callTime)
+  }
+
+  func hideAutoScreen() {
+    assert(scheduler.isOnWorker)
+    isAutoScreenHidden = true
   }
 
   func flush() {
