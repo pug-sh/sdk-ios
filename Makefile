@@ -3,7 +3,7 @@
 # tools come through SwiftPM, pinned by Package.resolved and Tools/Package.resolved, except Swift
 # itself and buf, which only re-vendoring proto/ needs.
 
-.PHONY: sync-protos proto-latest check-proto-pin protos protoc reference descriptors typed-track check-codegen verify-version fmt lint build test check ci build-ios test-ios tsan check-ios docker-image
+.PHONY: sync-protos proto-latest check-proto-pin protos protoc reference descriptors typed-track check-codegen verify-version fmt lint build test check ci build-ios test-ios tsan check-ios docker-image xtool-image xtool-sdk xtool-build-ios
 
 # `ci` must run `protos` before `check-codegen` diffs the generated files. Keep everything serial
 # even under `make -jN`.
@@ -149,3 +149,30 @@ docker-image:
 
 docker-%: docker-image
 	docker run --rm --user "$$(id -u):$$(id -g)" --env HOME=/tmp --volume "$(CURDIR):/src" --workdir /src $(DOCKER_IMAGE) make $*
+
+# The SDK for an iOS device, and its tests for the simulator, without a Mac, in xtool's container
+# (Tools/xtool.Dockerfile). Install the Darwin Swift SDK once, from an Xcode.xip downloaded with an Apple ID,
+# with `make xtool-sdk XIP=/path/to/Xcode.xip`: it lands in ~/.swiftpm, where SwiftPM looks for it. Builds go
+# to .build/xtool, apart from the Linux ones, since the toolchain is newer than CI's.
+XTOOL_IMAGE := pug-sdk-ios-xtool
+XTOOL_SDK := /tmp/.config/swiftpm/swift-sdks/darwin.artifactbundle
+# Through the XDG variables, since Foundation reads the home directory from /etc/passwd, not HOME.
+XTOOL_RUN = docker run --rm --user "$$(id -u):$$(id -g)" --env HOME=/tmp --env XDG_CONFIG_HOME=/tmp/.config \
+  --env XDG_CACHE_HOME=/tmp/.cache --volume "$(HOME)/.swiftpm:/tmp/.config/swiftpm" --volume "$(CURDIR):/src" \
+  --workdir /src
+# swift-build, SwiftPM's default, as xtool runs it: it fails with --swift-sdk.
+XTOOL_BUILD = $(XTOOL_RUN) --env XCODE_EXTRA_PLATFORM_FOLDERS=$(XTOOL_SDK)/Developer/Platforms $(XTOOL_IMAGE) \
+  swift build --scratch-path .build/xtool --toolset $(XTOOL_SDK)/toolset-swb.json $(WARNINGS_AS_ERRORS)
+
+xtool-image:
+	docker build --quiet --tag $(XTOOL_IMAGE) - < Tools/xtool.Dockerfile > /dev/null
+
+xtool-sdk: xtool-image
+	@test -f "$(XIP)" || { echo "usage: make xtool-sdk XIP=/path/to/Xcode.xip"; exit 1; }
+	mkdir -p "$(HOME)/.swiftpm"
+	$(XTOOL_RUN) --volume "$(abspath $(XIP)):/tmp/Xcode.xip:ro" $(XTOOL_IMAGE) xtool sdk install --slim /tmp/Xcode.xip
+
+xtool-build-ios: xtool-image
+	mkdir -p "$(HOME)/.swiftpm"
+	$(XTOOL_BUILD) --triple arm64-apple-ios --target Pug
+	$(XTOOL_BUILD) --triple arm64-apple-ios-simulator --build-tests
