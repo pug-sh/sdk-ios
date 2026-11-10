@@ -46,7 +46,13 @@ final class ClientCore: @unchecked Sendable {
         "No storage directory is available; state is kept in memory until the app restarts")
       return (Pug.MemoryStorage(), nil)
     }
-    let files = FileStorage(directory: directory, logger: configuration.logger, scheduler: scheduler)
+    // iOS stops an app extension without notice, so it writes each change at once.
+    let files = FileStorage(
+      directory: directory,
+      logger: configuration.logger,
+      scheduler: scheduler,
+      syncDelayMillis: platform.isAppExtension ? 0 : FileStorage.syncDelayMillis
+    )
     return (files, files)
   }
 
@@ -233,7 +239,7 @@ final class ClientCore: @unchecked Sendable {
     if shown.utf8.count != name.utf8.count {
       logger.warning("A screen name was truncated to \(Limits.maxStringBytes) bytes")
     }
-    guard shown != screen else {
+    guard !shown.isUTF8Equal(screen) else {
       logger.debug("A screen view was not tracked: the screen is the current one")
       return
     }
@@ -329,6 +335,8 @@ final class ClientCore: @unchecked Sendable {
     guard !isDisposed else { return }
     isDisposed = true
     dispatcher.dispose()
+    // Answers from here on are ignored, so an identify the server applied later would go unrecorded.
+    transport.cancelAll()
     fileStorage?.sync()
     let undelivered = dispatcher.undelivered
     if undelivered > 0 {
@@ -403,14 +411,16 @@ final class ClientCore: @unchecked Sendable {
     isOpen = capture(Pug.Events.appOpen, [:], at: now)
   }
 
-  /// Sends every queued event, backoff or not, and writes storage now and again once the sends settle, when
-  /// `settled` runs.
+  /// Sends every queued event, backoff or not, and writes storage now and again once the sends and identify calls
+  /// settle, when `settled` runs.
   private func drainAndPersist(then settled: (@Sendable () -> Void)? = nil) {
     dispatcher.drain { [self] in
-      if !isDisposed {
-        fileStorage?.sync()
+      whenIdentifiesSettle { [self] in
+        if !isDisposed {
+          fileStorage?.sync()
+        }
+        settled?()
       }
-      settled?()
     }
     fileStorage?.sync()
   }

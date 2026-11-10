@@ -63,13 +63,16 @@ final class Client: Sendable {
     propertyMapper = PropertyMapper(logger: logger)
     traitsMapper = TraitsMapper(logger: logger)
     factory = EventFactory(projectId: configuration.projectId, logger: logger, properties: propertyMapper, ids: ids)
-    ops = OpQueue(scheduler: scheduler)
+    // Events beyond what the queue holds would only push out older ones once start-up runs them.
+    ops = OpQueue(scheduler: scheduler, maxDroppable: configuration.batchMaxQueueSize)
   }
 
-  /// Runs the client once `previous`, the last client's teardown, has finished, and observes the app's lifecycle,
-  /// whose callbacks wait for start-up like any call.
+  /// Observes the app's lifecycle, whose callbacks wait for start-up like any call, and runs the client once
+  /// `previous`, the last client's teardown, has finished.
   func start(after previous: Teardown?) {
     let startTime = clock.nowMillis
+    // First, so that on the main thread the device is read before any event.
+    observeLifecycle()
     let begin: @Sendable () -> Void = { [self] in
       scheduler.run { [self] in restore(startTime: startTime) }
     }
@@ -78,7 +81,6 @@ final class Client: Sendable {
     } else {
       begin()
     }
-    observeLifecycle()
   }
 
   /// Runs the calls made so far, then a final flush of at most `teardownTimeoutMillis`, after which `teardown`
@@ -93,6 +95,7 @@ final class Client: Sendable {
   func track(_ kind: String, properties: [String: Any]?, options: Pug.TrackOptions?) {
     let callTime = clock.nowMillis
     guard factory.acceptsKind(kind) else { return }
+    platform.refreshDevice()
     // Mapped here, since values the host holds by reference may change once track returns.
     let custom = properties.map { propertyMapper.mapCustom(kind: kind, $0) } ?? [:]
     if let event = WellKnownEvents.byKind[kind] {
@@ -104,6 +107,7 @@ final class Client: Sendable {
   /// `values` are `event`'s properties in schema order, nil where the caller left them out.
   func trackTyped(_ event: EventSchema, _ values: [Any?], extras: [String: Any]?, options: Pug.TrackOptions?) {
     let callTime = clock.nowMillis
+    platform.refreshDevice()
     let custom = propertyMapper.mapTyped(event, values: values, extras: extras)
     submitCapture("Pug.\(event.label)()", event.kind, custom, at: callTime, options: options)
   }
@@ -128,6 +132,7 @@ final class Client: Sendable {
       logger.warning("A screen with a blank name was dropped")
       return
     }
+    platform.refreshDevice()
     enqueue("Pug.screen()") { $0.showScreen(name, screenClass: nil, at: callTime) }
   }
 
@@ -179,15 +184,40 @@ final class Client: Sendable {
 
   private func restore(startTime: Int64) {
     let (primary, files) = ClientCore.storage(configuration: configuration, platform: platform, scheduler: scheduler)
-    let keys = StorageKeys(projectId: configuration.projectId)
-    // Files that exist but cannot be read, as before the first unlock after a reboot, are waited for: in memory, this
+    let keys = StorageKeys(projectId: configuration.projectId).all
+    let proceed: @Sendable () -> Void = { [self] in restore(startTime: startTime, primary: primary, files: files) }
+    // Storage that cannot be read yet, as before the first unlock after a reboot, is waited for: in memory, this
     // process would track the user as someone new. The calls made meanwhile wait in the op queue.
-    if let files, !files.canRead(keys.all) {
-      platform.whenProtectedDataAvailable(logger: logger) { [self] in
-        scheduler.run { [self] in restore(startTime: startTime, primary: primary, files: files) }
-      }
+    if Self.canRead(primary, keys) {
+      proceed()
+    } else if platform.isAppExtension {
+      logger.debug("Storage cannot be read until the device is unlocked; Pug starts then")
+      poll(primary, keys, then: proceed)
     } else {
-      restore(startTime: startTime, primary: primary, files: files)
+      platform.whenProtectedDataAvailable(logger: logger) { [self] in scheduler.run(proceed) }
+    }
+  }
+
+  // An app extension is not told of the unlock, so it tries again every second.
+  private func poll(_ storage: any Pug.Storage, _ keys: [String], then proceed: @escaping @Sendable () -> Void) {
+    _ = scheduler.runAfter(milliseconds: 1_000) { [self] in
+      if Self.canRead(storage, keys) {
+        proceed()
+      } else {
+        poll(storage, keys, then: proceed)
+      }
+    }
+  }
+
+  // The default storage keeps what it reads, so start-up does not read the files again.
+  private static func canRead(_ storage: any Pug.Storage, _ keys: [String]) -> Bool {
+    do {
+      for key in keys {
+        _ = try storage.string(forKey: key)
+      }
+      return true
+    } catch {
+      return false
     }
   }
 
@@ -206,7 +236,12 @@ final class Client: Sendable {
     )
     consentRead(core.trackingConsent, isPending: core.isConsentPending)
     core.start(at: startTime)
-    ops.start(with: core)
+    let dropped = ops.start(with: core)
+    if dropped > 0 {
+      logger.warning(
+        "Dropped the oldest \(eventCount(dropped)) tracked before storage could be read: at most batchMaxQueueSize "
+          + "(\(configuration.batchMaxQueueSize)) wait for it")
+    }
   }
 
   /// Releases the whenConsentReady() callbacks once start-up has read consent.
@@ -241,6 +276,7 @@ final class Client: Sendable {
     }
   }
 
+  // Reported once: a host logger may read a getter, which would log again, and so on until the stack overflows.
   private func currentConsent() -> ConsentView? {
     let (view, isFirstReport) = consent.withLock { state -> (ConsentView?, Bool) in
       if let view = state.view {
@@ -249,15 +285,10 @@ final class Client: Sendable {
       defer { state.isUnknownReported = true }
       return (nil, !state.isUnknownReported)
     }
-    if view == nil {
-      let message =
+    if isFirstReport {
+      logger.warning(
         "Tracking consent was asked for before Pug read it from storage; it is reported as unknown. Ask from "
-        + "Pug.whenConsentReady() instead"
-      if isFirstReport {
-        logger.warning(message)
-      } else {
-        logger.debug(message)
-      }
+          + "Pug.whenConsentReady() instead")
     }
     return view
   }
@@ -279,13 +310,19 @@ final class Client: Sendable {
   ) {
     let occurTime = factory.occurTime(kind: kind, timestamp: options?.timestamp, callTimeMillis: callTime)
     let immediate = options?.immediate == true
-    enqueue(caller) { $0.capture(kind, custom, at: callTime, occurTime: occurTime, immediate: immediate) }
+    enqueue(caller, isDroppable: true) {
+      $0.capture(kind, custom, at: callTime, occurTime: occurTime, immediate: immediate)
+    }
   }
 
   /// Queues `op` for the worker. Once the client is destroyed, logs `label` as ignored and returns false.
   @discardableResult
-  private func enqueue(_ label: String, _ op: @escaping @Sendable (ClientCore) -> Void) -> Bool {
-    let isQueued = ops.submit(op)
+  private func enqueue(
+    _ label: String,
+    isDroppable: Bool = false,
+    _ op: @escaping @Sendable (ClientCore) -> Void
+  ) -> Bool {
+    let isQueued = ops.submit(op, isDroppable: isDroppable)
     if !isQueued {
       logger.debug("\(label) was ignored: Pug was destroyed")
     }

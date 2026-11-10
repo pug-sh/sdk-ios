@@ -10,6 +10,8 @@ final class UIKitPlatform: Platform {
   private let foundation = FoundationPlatform()
   // What the main thread read last, for every client.
   private let snapshot = Locked<DeviceSnapshot?>(nil)
+  // Started with the first call to Pug, so that it has likely reported by the first event.
+  private let network = NetworkMonitor.shared
 
   var isAppExtension: Bool {
     Self.isExtension
@@ -42,8 +44,7 @@ final class UIKitPlatform: Platform {
 
   func autoProperties(logger: SafeLogger) -> any AutoProperties {
     let bundle = Bundle.main
-    // Started now, so that it has likely reported by the first event.
-    let network = NetworkMonitor.shared
+    let network = network
     return DeviceAutoProperties(
       info: bundle.infoDictionary ?? [:],
       bundleIdentifier: bundle.bundleIdentifier,
@@ -80,6 +81,12 @@ final class UIKitPlatform: Platform {
 
   func runOnMain(_ work: @escaping @MainActor @Sendable () -> Void) {
     DispatchQueue.main.async { MainActor.assumeIsolated(work) }
+  }
+
+  func refreshDevice() {
+    guard Thread.isMainThread else { return }
+    let snapshot = snapshot
+    MainActor.assumeIsolated { UIKitLifecycle.refresh(snapshot) }
   }
 
   // The simulated device's on a simulator, and the Mac's for an app running on one.
@@ -139,7 +146,7 @@ private final class UIKitLifecycle: Cancellable, ScreenListener {
     observations = [
       observe(UIApplication.willEnterForegroundNotification) { $0.enterForeground() },
       observe(UIApplication.didBecomeActiveNotification) { $0.enterForeground() },
-      observe(UIApplication.didEnterBackgroundNotification) { $0.tracker.enterBackground() },
+      observe(UIApplication.didEnterBackgroundNotification) { $0.enterBackground() },
     ]
     if screens {
       ScreenTracker.shared.listener = self
@@ -156,20 +163,34 @@ private final class UIKitLifecycle: Cancellable, ScreenListener {
 
   func viewControllerDidAppear(_ controller: UIViewController, name: String, screenClass: String) {
     Self.refresh(snapshot)
-    tracker.screenDidAppear(controller, name: name, screenClass: screenClass)
+    tracker.screenDidAppear(controller, layer: Self.root(of: controller), name: name, screenClass: screenClass)
   }
 
   func viewControllerDidDisappear(_ controller: UIViewController) {
-    tracker.screenDidDisappear(controller)
+    tracker.screenDidDisappear(controller, isDismissed: Self.root(of: controller).isBeingDismissed)
   }
 
   private static func isActive() -> Bool {
     UIKitPlatform.application()?.applicationState == .active
   }
 
+  // A presented view controller has no parent, so this is the presented one or the window's root.
+  private static func root(of controller: UIViewController) -> UIViewController {
+    var root = controller
+    while let parent = root.parent {
+      root = parent
+    }
+    return root
+  }
+
   private func enterForeground() {
     Self.refresh(snapshot)
     tracker.enterForeground()
+  }
+
+  private func enterBackground() {
+    Self.refresh(snapshot)
+    tracker.enterBackground()
   }
 
   private func stop() {

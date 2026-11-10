@@ -1,3 +1,5 @@
+import Testing
+
 @testable import Pug
 
 /// Records every call and answers from a script, accepting everything by default. After `hold()`, calls wait until
@@ -12,6 +14,7 @@ final class FakeTransport: Transport {
     var identifyAnswers: [Result<Void, TransportError>] = []
     var holding = false
     var held: [PendingWork] = []
+    var cancels = 0
   }
 
   private let state = Locked(State())
@@ -36,6 +39,11 @@ final class FakeTransport: Transport {
 
   var kinds: [[String]] {
     batches.map { $0.map(\.kind) }
+  }
+
+  /// How many times the calls in flight were cancelled.
+  var cancels: Int {
+    state.withLock { $0.cancels }
   }
 
   /// While set, every batch fails with this code.
@@ -65,8 +73,12 @@ final class FakeTransport: Transport {
   }
 
   /// Lets the `index`th held call, in call order, finish.
-  func release(_ index: Int) {
-    state.withLock { $0.held[index] }.run()
+  func release(_ index: Int, sourceLocation: SourceLocation = #_sourceLocation) {
+    guard let call = state.withLock({ $0.held.indices.contains(index) ? $0.held[index] : nil }) else {
+      Issue.record("no call \(index) is held", sourceLocation: sourceLocation)
+      return
+    }
+    call.run()
   }
 
   func releaseAll() {
@@ -93,6 +105,10 @@ final class FakeTransport: Transport {
     answer { [self] in
       completion(state.withLock { $0.identifyAnswers.isEmpty ? .success(()) : $0.identifyAnswers.removeFirst() })
     }
+  }
+
+  func cancelAll() {
+    state.withLock { $0.cancels += 1 }
   }
 
   // At once, or on release while holding.

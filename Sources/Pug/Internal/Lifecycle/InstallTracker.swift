@@ -55,7 +55,14 @@ final class InstallTracker {
 
   /// Tracks the pending event, if any, through `capture`, which returns whether it was captured.
   func emit(_ capture: (_ kind: String, _ properties: [String: String]) -> Bool) {
-    guard let event = pending, capture(event.kind, event.properties) else { return }
+    guard let event = pending else { return }
+    // A read after check() failed: memory would not keep the version, so every launch would track this again.
+    guard !storage.hasFailedOver else {
+      pending = nil
+      logger.debug("app_install and app_update are not tracked: storage could not be read")
+      return
+    }
+    guard capture(event.kind, event.properties) else { return }
     pending = nil
     storage.setString(event.version, forKey: keys.lastVersion)
   }

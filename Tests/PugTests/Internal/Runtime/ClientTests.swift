@@ -43,6 +43,26 @@ struct ClientTests {
     }
   }
 
+  /// Records like its base, and reads a consent getter at every line, as a logger that adds it to each might.
+  private struct ConsentReadingLogger: Pug.Logger {
+    let base: RecordingLogger
+    let client: Locked<Client?>
+
+    func debug(_ message: String) {
+      base.debug(message)
+      _ = client.withLock { $0 }?.isTrackingEnabled
+    }
+
+    func warning(_ message: String, error: (any Error)?) {
+      base.warning(message, error: error)
+      _ = client.withLock { $0 }?.isTrackingEnabled
+    }
+
+    func error(_ message: String, error: (any Error)?) {
+      base.error(message, error: error)
+    }
+  }
+
   private let scheduler: TestScheduler
   private let transport: FakeTransport
   private let logger = RecordingLogger()
@@ -104,6 +124,27 @@ struct ClientTests {
     #expect(
       logger.debugs.filter { $0.contains("missing") } == ["Event \"add_to_cart\" is missing its required \"productId\""]
     )
+  }
+
+  @Test("an event tracked on the main thread reads the device anew, as after a rotation")
+  func refreshesDevice() throws {
+    let client = try makeClient()
+
+    client.track("a", properties: nil, options: nil)
+    client.screen("Home")
+
+    #expect(platform.deviceRefreshes == 2)
+  }
+
+  @Test("a screen name that differs from the current one only in its Unicode normalization is a new screen")
+  func screenNormalization() throws {
+    let client = try makeClient { $0.batchMaxSize = 2 }
+
+    client.screen("Caf\u{E9}")
+    client.screen("Cafe\u{301}")
+    scheduler.runCurrent()
+
+    #expect(transport.kinds == [["screen_view", "screen_view"]])
   }
 
   @Test("a timestamp option sets when the event happened")
@@ -440,6 +481,31 @@ struct ClientTests {
     )
   }
 
+  @Test("a logger that reads consent hears once that it is unknown, rather than without end")
+  func consentReadingLogger() throws {
+    let running = Locked<Client?>(nil)
+    let client = try makeClient(after: Teardown()) { $0.logger = ConsentReadingLogger(base: logger, client: running) }
+    running.withLock { $0 = client }
+
+    #expect(!client.isTrackingEnabled)
+    #expect(!client.isTrackingEnabled)
+
+    #expect(logger.entries.filter { $0.message.contains("reported as unknown") }.count == 1)
+  }
+
+  @Test("an opt-out queued behind the call that filled a batch drops that batch unsent")
+  func optOutBeforeSend() throws {
+    let previous = Teardown()
+    let client = try makeClient(after: previous) { $0.batchMaxSize = 1 }
+
+    client.track("a", properties: nil, options: nil)
+    client.optOutTracking()
+    previous.finish()
+    scheduler.advanceUntilIdle()
+
+    #expect(transport.batches.isEmpty)
+  }
+
   @Test("a choice made before start-up has read consent wins over the stored one")
   func choiceBeforeStartUp() throws {
     storage.setString("granted", forKey: keys.consent)
@@ -623,6 +689,21 @@ struct ClientTests {
     #expect(storage.string(forKey: keys.externalId) == "user-1")
     #expect(transport.kinds == [["x"]])
     #expect(storage.string(forKey: keys.queue) == nil)
+  }
+
+  @Test("destroy cancels the calls still in flight once it lets go of storage")
+  func destroyCancels() throws {
+    let client = try makeClient()
+    transport.hold()
+    client.identify("user-1", traits: nil)
+
+    client.destroy()
+    scheduler.advanceTime(by: Client.teardownTimeoutMillis - 1)
+    #expect(transport.cancels == 0)
+    scheduler.advanceTime(by: 1)
+    scheduler.runCurrent()
+
+    #expect(transport.cancels == 1)
   }
 
   @Test("an immediate event that destroy stops waiting for is kept")

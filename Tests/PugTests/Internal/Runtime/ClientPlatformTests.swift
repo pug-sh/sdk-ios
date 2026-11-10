@@ -123,6 +123,23 @@ final class ClientPlatformTests {
     #expect(settled.withLock { $0 })
   }
 
+  @Test("leaving the foreground settles once identify calls have their answers too")
+  func backgroundSettlesAfterIdentify() throws {
+    let platform = FakePlatform()
+    let client = try makeClient(platform)
+    let settled = Locked(false)
+    transport.hold()
+
+    client.identify("user-1", traits: nil)
+    platform.background { settled.withLock { $0 = true } }
+    scheduler.runCurrent()
+    #expect(!settled.withLock { $0 })
+    transport.releaseAll()
+    scheduler.runCurrent()
+
+    #expect(settled.withLock { $0 })
+  }
+
   @Test("leaving the foreground after destroy settles at once")
   func backgroundAfterDestroySettles() throws {
     let platform = FakePlatform()
@@ -191,9 +208,10 @@ final class ClientPlatformTests {
     platform.background()
     scheduler.runCurrent()
 
+    // app_close is sent at once, while the batch it overtakes waits for the worker's next turn.
     let events = try transport.batches.map { try $0.single() }
     try #require(events.count == 3)
-    #expect(events.map(\.kind) == ["app_open", "app_open", "app_close"])
+    #expect(events.map(\.kind) == ["app_open", "app_close", "app_open"])
     #expect(events[0].distinctId != events[1].distinctId)
     #expect(events[1].distinctId == events[2].distinctId)
   }
@@ -555,6 +573,63 @@ final class ClientPlatformTests {
     #expect(!logger.warnings.contains { $0.hasPrefix("Storage failed") })
   }
 
+  @Test("a host storage that cannot be read before the first unlock is waited for too")
+  func hostStorageWaitsForUnlock() throws {
+    let host = LockableStorage()
+    let platform = FakePlatform(locked: true)
+    let client = try makeClient(platform) {
+      $0.storage = host
+      $0.batchMaxSize = 1
+    }
+
+    client.track("b", properties: nil, options: nil)
+    scheduler.runCurrent()
+    #expect(platform.isWaitingForProtectedData)
+    #expect(transport.batches.isEmpty)
+    host.unlock()
+    platform.unlock()
+    scheduler.runCurrent()
+
+    #expect(transport.kinds == [["b"]])
+    #expect(!logger.warnings.contains { $0.hasPrefix("Storage failed") })
+  }
+
+  @Test("an app extension, which is not told of the unlock, tries its files again every second")
+  func extensionPollsForUnlock() throws {
+    let directory = root.appendingPathComponent("pug")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let unreadable = try makeUnreadable(directory.appendingPathComponent(FileStorage.fileName(keys.queue)))
+    let client = try makeClient(FakePlatform(directory: directory, appExtension: true)) {
+      $0.storage = nil
+      $0.batchMaxSize = 1
+    }
+
+    client.track("b", properties: nil, options: nil)
+    scheduler.advanceTime(by: 1_000)
+    scheduler.runCurrent()
+    #expect(transport.batches.isEmpty)
+    try unreadable.restore()
+    scheduler.advanceTime(by: 1_000)
+    scheduler.runCurrent()
+
+    #expect(transport.kinds == [["b"]])
+    #expect(!logger.warnings.contains { $0.hasPrefix("Storage failed") })
+  }
+
+  @Test("an app extension, which iOS stops without notice, writes each change at once")
+  func extensionWritesAtOnce() throws {
+    let directory = root.appendingPathComponent("pug")
+    let client = try makeClient(FakePlatform(directory: directory, appExtension: true)) {
+      $0.storage = nil
+      $0.batchMaxWait = 60
+    }
+
+    client.track("a", properties: nil, options: nil)
+    scheduler.runCurrent()
+
+    #expect(try storedKinds(directory) == ["a"])
+  }
+
   @Test("files still unreadable once the device is unlocked move the client to memory")
   func unreadableAfterUnlock() throws {
     let directory = root.appendingPathComponent("pug")
@@ -684,6 +759,33 @@ final class ClientPlatformTests {
     guard FileManager.default.fileExists(atPath: file.path) else { return [] }
     let array = try #require(StoredJSON.parse(try String(contentsOf: file, encoding: .utf8)) as? [Any])
     return try array.map { try #require(EventJSON.decode($0)).kind }
+  }
+}
+
+/// Memory that cannot be read until `unlock()`, as a Keychain item before the first unlock after a reboot.
+private final class LockableStorage: Pug.Storage {
+  private struct Unavailable: Error {}
+
+  private let memory = Pug.MemoryStorage()
+  private let isLocked = Locked(true)
+
+  func unlock() {
+    isLocked.withLock { $0 = false }
+  }
+
+  func string(forKey key: String) throws -> String? {
+    if isLocked.withLock({ $0 }) {
+      throw Unavailable()
+    }
+    return memory.string(forKey: key)
+  }
+
+  func setString(_ value: String, forKey key: String) {
+    memory.setString(value, forKey: key)
+  }
+
+  func removeValue(forKey key: String) {
+    memory.removeValue(forKey: key)
   }
 }
 

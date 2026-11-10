@@ -11,7 +11,7 @@ public enum Pug {
   /// warning until `destroy()`.
   ///
   /// - Throws: `ConfigurationError` for a blank project id, an API key that is not a public key (`pub_…`) or an
-  ///   endpoint that is not an http(s) URL.
+  ///   endpoint that is not an http(s) URL without a query or fragment.
   public static func initialize(projectId: String, options: Options) throws(ConfigurationError) {
     try facade.initialize(projectId: projectId, options: options)
   }

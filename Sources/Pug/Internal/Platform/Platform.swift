@@ -24,6 +24,10 @@ protocol Platform: Sendable {
 
   /// Runs `work` on the main thread later, even when called there.
   func runOnMain(_ work: @escaping @MainActor @Sendable () -> Void)
+
+  /// Called on the main thread, reads anew what auto-properties take from it, such as the screen's size after a
+  /// rotation. Elsewhere, does nothing.
+  func refreshDevice()
 }
 
 protocol AutoProperties {

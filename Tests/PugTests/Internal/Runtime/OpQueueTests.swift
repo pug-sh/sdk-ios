@@ -47,6 +47,20 @@ struct OpQueueTests {
     #expect(ran.withLock { $0 } == ["c1: a", "c1: last"])
   }
 
+  @Test("beyond the cap, the oldest droppable op waiting is dropped, and start says how many were")
+  func dropsOldest() {
+    let ops = OpQueue<String>(scheduler: scheduler, maxDroppable: 2)
+
+    _ = ops.submit(record("a"), isDroppable: true)
+    _ = ops.submit(record("kept"))
+    _ = ops.submit(record("b"), isDroppable: true)
+    _ = ops.submit(record("c"), isDroppable: true)
+    let dropped = ops.start(with: "c1")
+
+    #expect(dropped == 1)
+    #expect(ran.withLock { $0 } == ["c1: kept", "c1: b", "c1: c"])
+  }
+
   @Test("ops from many threads all run, each thread's in its order")
   func concurrentSubmitters() async {
     let scheduler = DispatchScheduler()

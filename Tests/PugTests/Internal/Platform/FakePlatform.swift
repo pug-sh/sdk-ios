@@ -13,6 +13,7 @@ final class FakePlatform: Platform {
     var installSourceReads = 0
     var isProtectedDataAvailable: Bool
     var protectedDataWaiters: [@Sendable () -> Void] = []
+    var deviceRefreshes = 0
   }
 
   private struct FixedProperties: AutoProperties {
@@ -84,6 +85,10 @@ final class FakePlatform: Platform {
     state.withLock { $0.installSourceReads }
   }
 
+  var deviceRefreshes: Int {
+    state.withLock { $0.deviceRefreshes }
+  }
+
   func storageDirectory() -> URL? {
     directory
   }
@@ -125,6 +130,10 @@ final class FakePlatform: Platform {
     } else {
       state.withLock { $0.mainThread.append(work) }
     }
+  }
+
+  func refreshDevice() {
+    state.withLock { $0.deviceRefreshes += 1 }
   }
 
   /// Runs what was posted to the main thread so far, as its run loop would.

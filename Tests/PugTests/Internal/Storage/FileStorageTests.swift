@@ -148,18 +148,27 @@ final class FileStorageTests {
     #expect(try storage.string(forKey: Self.otherKey) == nil)
   }
 
-  @Test("canRead reads each key, keeping what it read, and fails on a file that cannot be read")
-  func canRead() throws {
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    try Data("v1".utf8).write(to: file(Self.key))
+  @Test("a value that differs only in its Unicode normalization is written")
+  func normalization() throws {
     let storage = makeStorage()
+    storage.setString("Jos\u{E9}", forKey: Self.key)
+    storage.sync()
 
-    #expect(storage.canRead([Self.key, Self.otherKey]))
-    try FileManager.default.removeItem(at: file(Self.key))
-    #expect(try storage.string(forKey: Self.key) == "v1")
+    storage.setString("Jose\u{301}", forKey: Self.key)
+    storage.sync()
 
-    try FileManager.default.createDirectory(at: file(Self.key), withIntermediateDirectories: true)
-    #expect(!makeStorage().canRead([Self.otherKey, Self.key]))
+    #expect(Array(try contents(Self.key).utf8) == Array("Jose\u{301}".utf8))
+  }
+
+  @Test("with no sync delay, a change reaches the disk once the work that made it is done")
+  func noSyncDelay() throws {
+    let storage = FileStorage(directory: directory, logger: logger.safe(), scheduler: scheduler, syncDelayMillis: 0)
+
+    storage.setString("v1", forKey: Self.key)
+    #expect(!exists(Self.key))
+    scheduler.runCurrent()
+
+    #expect(try contents(Self.key) == "v1")
   }
 
   @Test("an unreadable file moves the client to memory and leaves the files as they were")

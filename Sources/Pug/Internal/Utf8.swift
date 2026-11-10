@@ -5,6 +5,13 @@ extension String {
     utf8.starts(with: prefix.utf8)
   }
 
+  /// Whether the UTF-8 bytes are those of `other`, as the server compares strings. `==` takes canonically equivalent
+  /// strings, such as "é" and "e\u{301}", as equal.
+  func isUTF8Equal(_ other: String?) -> Bool {
+    guard let other else { return false }
+    return utf8.elementsEqual(other.utf8)
+  }
+
   /// The longest prefix that fits in `maxBytes` of UTF-8 without splitting a Unicode scalar.
   func truncatedUTF8(maxBytes: Int) -> String {
     let utf8 = self.utf8

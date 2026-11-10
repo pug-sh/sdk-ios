@@ -79,7 +79,7 @@ struct TrackNamespaceTests {
     #expect(
       logger.warnings == [
         "Property \"position\" on event \"video_play\" was dropped: nan is not a finite number",
-        "Property \"position\" on event \"video_pause\" was dropped: 1e+300 seconds is out of range",
+        "Property \"position\" on event \"video_pause\" was dropped: it is out of range",
       ]
     )
   }

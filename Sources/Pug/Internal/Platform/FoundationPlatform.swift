@@ -6,9 +6,13 @@ struct FoundationPlatform: Platform {
     false
   }
 
+  // Outside a sandbox, as for a Mac app, Application Support is the user's, shared by every app.
   func storageDirectory() -> URL? {
-    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-      .appendingPathComponent("pug", isDirectory: true)
+    var directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+    if let bundleIdentifier = Bundle.main.bundleIdentifier, !bundleIdentifier.isEmpty {
+      directory = directory?.appendingPathComponent(bundleIdentifier, isDirectory: true)
+    }
+    return directory?.appendingPathComponent("pug", isDirectory: true)
   }
 
   func whenProtectedDataAvailable(logger: SafeLogger, _ work: @escaping @Sendable () -> Void) {
@@ -30,6 +34,8 @@ struct FoundationPlatform: Platform {
   func runOnMain(_ work: @escaping @MainActor @Sendable () -> Void) {
     Task { @MainActor in work() }
   }
+
+  func refreshDevice() {}
 }
 
 private struct NoAutoProperties: AutoProperties {

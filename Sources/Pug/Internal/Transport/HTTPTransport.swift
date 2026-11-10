@@ -65,6 +65,10 @@ final class HTTPTransport: Transport {
     }
   }
 
+  func cancelAll() {
+    delegate.cancelAll()
+  }
+
   private func post(
     _ body: [UInt8],
     to url: URL?,
@@ -154,6 +158,14 @@ final class HTTPTransport: Transport {
         deadline.run()
       }
       task.resume()
+    }
+
+    // Task by task rather than by invalidating the session, which could not start another.
+    fileprivate func cancelAll() {
+      let tasks = exchanges.withLock { $0.values.map(\.task) }
+      for task in tasks {
+        task.cancel()
+      }
     }
 
     func urlSession(

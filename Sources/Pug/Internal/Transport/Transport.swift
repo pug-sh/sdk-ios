@@ -3,6 +3,9 @@ protocol Transport: Sendable {
   func sendBatch(_ events: [Event], completion: @escaping @Sendable (BatchResult) -> Void)
 
   func identify(_ request: IdentifyRequest, completion: @escaping @Sendable (Result<Void, TransportError>) -> Void)
+
+  /// Cancels the calls in flight, which then complete as failed.
+  func cancelAll()
 }
 
 /// A batch's outcome: the server's acknowledgement, nil for a 2xx body that could not be read, or the failure.

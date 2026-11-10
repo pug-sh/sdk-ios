@@ -4,19 +4,29 @@
 /// launch in the background, is reported once the app comes to it. Confined to the main thread.
 @MainActor
 final class AppLifecycleTracker {
-  private struct PendingScreen {
+  private struct Screen {
     weak var controller: AnyObject?
+    weak var layer: AnyObject?
     let name: String
     let screenClass: String
+  }
+
+  // A screen left in view beneath a presentation, such as a sheet, whose dismissal UIKit reports to no view controller
+  // beneath it.
+  private struct Covered {
+    weak var layer: AnyObject?
+    let screen: Screen
   }
 
   private let observer: any LifecycleObserver
   private let beginBackgroundTask: @MainActor @Sendable () -> @Sendable () -> Void
   private var isForeground = false
   private var isStopped = false
-  // The screen reported last, which returns when what covered it goes.
-  private weak var screen: AnyObject?
-  private var pending: PendingScreen?
+  // The screen reported last, which returns when what covered it goes, and whether it has disappeared since.
+  private var screen: Screen?
+  private var isScreenHidden = false
+  private var covered: [Covered] = []
+  private var pending: Screen?
 
   /// `beginBackgroundTask` returns what ends the task, from any thread.
   nonisolated init(
@@ -33,9 +43,7 @@ final class AppLifecycleTracker {
     observer.appDidEnterForeground()
     if let pending {
       self.pending = nil
-      if let controller = pending.controller {
-        report(controller, name: pending.name, screenClass: pending.screenClass)
-      }
+      report(pending)
     }
   }
 
@@ -45,22 +53,25 @@ final class AppLifecycleTracker {
     observer.appDidEnterBackground(then: beginBackgroundTask())
   }
 
-  /// `controller` is a view controller that is a screen.
-  func screenDidAppear(_ controller: AnyObject, name: String, screenClass: String) {
+  /// `controller` is a view controller that is a screen, and `layer` the root of its hierarchy: the window's root view
+  /// controller, or a presented one.
+  func screenDidAppear(_ controller: AnyObject, layer: AnyObject, name: String, screenClass: String) {
     guard !isStopped else { return }
-    if isForeground {
-      report(controller, name: name, screenClass: screenClass)
-    } else {
-      pending = PendingScreen(controller: controller, name: name, screenClass: screenClass)
-    }
+    show(Screen(controller: controller, layer: layer, name: name, screenClass: screenClass))
   }
 
-  func screenDidDisappear(_ controller: AnyObject) {
+  /// `isDismissed` when `controller` goes with the dismissal of the presentation it is in.
+  func screenDidDisappear(_ controller: AnyObject, isDismissed: Bool) {
     guard !isStopped else { return }
     if pending?.controller === controller {
       pending = nil
     }
-    if controller === screen {
+    covered.removeAll { $0.layer == nil || $0.screen.controller == nil || $0.screen.controller === controller }
+    guard let current = screen, current.controller === controller else { return }
+    isScreenHidden = true
+    if isDismissed, let index = covered.lastIndex(where: { $0.layer === current.layer }) {
+      show(covered.remove(at: index).screen)
+    } else {
       observer.screenDidDisappear()
     }
   }
@@ -69,11 +80,25 @@ final class AppLifecycleTracker {
   func stop() {
     isStopped = true
     pending = nil
+    covered = []
   }
 
-  private func report(_ controller: AnyObject, name: String, screenClass: String) {
-    let isReturning = controller === screen
-    screen = controller
-    observer.screenDidAppear(name: name, screenClass: screenClass, isReturning: isReturning)
+  private func show(_ shown: Screen) {
+    if isForeground {
+      report(shown)
+    } else {
+      pending = shown
+    }
+  }
+
+  private func report(_ shown: Screen) {
+    guard let controller = shown.controller else { return }
+    if let current = screen, current.controller != nil, current.layer !== shown.layer, !isScreenHidden {
+      covered.append(Covered(layer: shown.layer, screen: current))
+    }
+    let isReturning = screen?.controller === controller
+    screen = shown
+    isScreenHidden = false
+    observer.screenDidAppear(name: shown.name, screenClass: shown.screenClass, isReturning: isReturning)
   }
 }

@@ -177,6 +177,15 @@ struct ConfigurationTests {
     }
   }
 
+  @Test("an endpoint with a query or a fragment is refused, since the calls' paths would land in it")
+  func endpointQuery() throws {
+    for refused in ["https://proxy.example.com/pug?tenant=a", "https://proxy.example.com/pug#a"] {
+      var options = Pug.Options(apiKey: "pub_test")
+      options.endpoint = try #require(URL(string: refused))
+      expectRefused("The Pug endpoint must have no query or fragment: \"\(refused)\"", options: options)
+    }
+  }
+
   private func expectRefused(
     _ message: String,
     projectId: String = ConfigurationTests.project,

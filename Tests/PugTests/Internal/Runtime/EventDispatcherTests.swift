@@ -297,6 +297,7 @@ struct EventDispatcherTests {
     dispatcher.enqueue(event(0))
     dispatcher.sendNow(event(1))
     let drained = drain(dispatcher)
+    scheduler.runCurrent()
     transport.release(1)
     scheduler.runCurrent()
     #expect(!drained.withLock { $0 })

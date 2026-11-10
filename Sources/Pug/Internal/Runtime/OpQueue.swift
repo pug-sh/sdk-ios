@@ -3,24 +3,34 @@
 final class OpQueue<Context: Sendable>: Sendable {
   typealias Op = @Sendable (Context) -> Void
 
+  private struct Waiting: Sendable {
+    let op: Op
+    let isDroppable: Bool
+  }
+
   private struct State: Sendable {
     var context: Context?
-    var waiting: [Op] = []
+    var waiting: [Waiting] = []
+    var droppable = 0
+    var dropped = 0
     var isClosed = false
   }
 
   private let scheduler: any Scheduler
+  private let maxDroppable: Int
   private let state = Locked(State())
 
-  init(scheduler: any Scheduler) {
+  /// Of the droppable ops waiting for the context, which may take hours, the oldest beyond `maxDroppable` are dropped.
+  init(scheduler: any Scheduler, maxDroppable: Int = .max) {
     self.scheduler = scheduler
+    self.maxDroppable = maxDroppable
   }
 
   /// Queues `op`, or returns false once the queue is closed.
-  func submit(_ op: @escaping Op) -> Bool {
+  func submit(_ op: @escaping Op, isDroppable: Bool = false) -> Bool {
     state.withLock { state in
       guard !state.isClosed else { return false }
-      enqueue(op, in: &state)
+      enqueue(Waiting(op: op, isDroppable: isDroppable), in: &state)
       return true
     }
   }
@@ -31,30 +41,41 @@ final class OpQueue<Context: Sendable>: Sendable {
     state.withLock { state in
       guard !state.isClosed else { return false }
       state.isClosed = true
-      enqueue(op, in: &state)
+      enqueue(Waiting(op: op, isDroppable: false), in: &state)
       return true
     }
   }
 
-  /// Runs the ops queued so far with `context`, and later ones as they come. Called once, on the worker.
-  func start(with context: Context) {
+  /// Runs the ops queued so far with `context`, and later ones as they come, and returns how many droppable ones were
+  /// dropped while waiting. Called once, on the worker.
+  @discardableResult
+  func start(with context: Context) -> Int {
     assert(scheduler.isOnWorker)
-    let waiting = state.withLock { state in
+    let (waiting, dropped) = state.withLock { state in
       defer { state.waiting = [] }
       state.context = context
-      return state.waiting
+      return (state.waiting, state.dropped)
     }
-    for op in waiting {
-      op(context)
+    for waiting in waiting {
+      waiting.op(context)
     }
+    return dropped
   }
 
   // Scheduled under the lock, so that ops reach the worker in the order they were queued.
-  private func enqueue(_ op: @escaping Op, in state: inout State) {
+  private func enqueue(_ waiting: Waiting, in state: inout State) {
     guard let context = state.context else {
-      state.waiting.append(op)
+      state.waiting.append(waiting)
+      if waiting.isDroppable {
+        state.droppable += 1
+      }
+      if state.droppable > maxDroppable, let oldest = state.waiting.firstIndex(where: \.isDroppable) {
+        state.waiting.remove(at: oldest)
+        state.droppable -= 1
+        state.dropped += 1
+      }
       return
     }
-    scheduler.run { op(context) }
+    scheduler.run { waiting.op(context) }
   }
 }

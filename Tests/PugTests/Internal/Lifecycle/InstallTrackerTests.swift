@@ -10,6 +10,25 @@ struct InstallTrackerTests {
 
   private struct Failure: Error {}
 
+  /// `base`, except that reads of `key` fail.
+  private struct FailingKey: Pug.Storage {
+    let base: Pug.MemoryStorage
+    let key: String
+
+    func string(forKey key: String) throws -> String? {
+      guard key != self.key else { throw Failure() }
+      return base.string(forKey: key)
+    }
+
+    func setString(_ value: String, forKey key: String) {
+      base.setString(value, forKey: key)
+    }
+
+    func removeValue(forKey key: String) {
+      base.removeValue(forKey: key)
+    }
+  }
+
   private let memory = Pug.MemoryStorage()
   private let keys = StorageKeys(projectId: "proj_1")
   private let logger = RecordingLogger()
@@ -127,6 +146,20 @@ struct InstallTrackerTests {
 
     #expect(captured.withLock { $0 }.isEmpty)
     #expect(logger.debugs == ["app_install and app_update are not tracked: storage could not be read"])
+  }
+
+  @Test("a read that fails after the check tracks nothing, since memory would not keep the version")
+  func failureAfterCheck() {
+    memory.setString("1.0", forKey: keys.lastVersion)
+    let storage = SafeStorage(FailingKey(base: memory, key: keys.queue), logger: logger.safe())
+    let tracker = InstallTracker(storage: storage, keys: keys, logger: logger.safe())
+
+    tracker.check(appVersion: "1.1", installSource: unread)
+    _ = storage.string(forKey: keys.queue)
+    tracker.emit(capture)
+
+    #expect(captured.withLock { $0 }.isEmpty)
+    #expect(memory.string(forKey: keys.lastVersion) == "1.0")
   }
 
   private func makeTracker() -> InstallTracker {

@@ -79,6 +79,11 @@ struct Configuration: Sendable {
       throw Pug.ConfigurationError(
         "The Pug endpoint must be an http(s) URL, not \"\(options.endpoint.absoluteString)\"")
     }
+    // The paths of the calls are appended to the endpoint, so they would land in its query or fragment.
+    if options.endpoint.query != nil || options.endpoint.fragment != nil {
+      throw Pug.ConfigurationError(
+        "The Pug endpoint must have no query or fragment: \"\(options.endpoint.absoluteString)\"")
+    }
   }
 
   private static func positive(_ name: String, _ value: Int, default fallback: Int, _ warnings: inout [String]) -> Int {

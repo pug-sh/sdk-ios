@@ -130,10 +130,16 @@ final class EventDispatcher: @unchecked Sendable {
     completeDrains()
   }
 
+  // On the worker's next turn, as Android's launch: an opt-out queued behind the call that filled a batch purges it
+  // before it goes.
   private func send() {
     guard !sending else { return }
     cancelTimer()
-    sendNextBatch()
+    sending = true
+    scheduler.run { [self] in
+      guard !disposed else { return }
+      sendNextBatch()
+    }
   }
 
   private func sendNextBatch() {

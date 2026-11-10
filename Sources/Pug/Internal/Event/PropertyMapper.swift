@@ -31,8 +31,7 @@ struct PropertyMapper: Sendable {
       if let milliseconds = durationMilliseconds(seconds) {
         typed[field.name] = durationText(milliseconds: milliseconds)
       } else {
-        let reason =
-          seconds.isFinite ? "\(seconds) seconds is out of range" : "\(seconds) is not a finite number"
+        let reason = seconds.isFinite ? "it is out of range" : "\(seconds) is not a finite number"
         logger.warning("Property \"\(field.name)\" on event \"\(event.kind)\" was dropped: \(reason)")
       }
     }

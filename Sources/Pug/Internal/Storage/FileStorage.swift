@@ -21,6 +21,7 @@ final class FileStorage: Pug.Storage, @unchecked Sendable {
   private let directory: URL
   private let logger: SafeLogger
   private let scheduler: any Scheduler
+  private let delayMillis: Int64
   // A nil value is a key known to be absent.
   private var values: [String: String?] = [:]
   private var unsynced: Set<String> = []
@@ -28,10 +29,17 @@ final class FileStorage: Pug.Storage, @unchecked Sendable {
   private var failing = false
   private var isDirectoryExcluded = false
 
-  init(directory: URL, logger: SafeLogger, scheduler: any Scheduler) {
+  /// `syncDelayMillis` 0 writes each change once the work that made it is done.
+  init(
+    directory: URL,
+    logger: SafeLogger,
+    scheduler: any Scheduler,
+    syncDelayMillis: Int64 = FileStorage.syncDelayMillis
+  ) {
     self.directory = directory
     self.logger = logger
     self.scheduler = scheduler
+    delayMillis = syncDelayMillis
   }
 
   // A file that exists but cannot be read, as before the first unlock after a reboot, throws rather than reading
@@ -51,18 +59,6 @@ final class FileStorage: Pug.Storage, @unchecked Sendable {
     }
     values.updateValue(value, forKey: key)
     return value
-  }
-
-  /// Whether every one of `keys` can be read now. What it reads is kept, as by `string(forKey:)`.
-  func canRead(_ keys: [String]) -> Bool {
-    do {
-      for key in keys {
-        _ = try string(forKey: key)
-      }
-      return true
-    } catch {
-      return false
-    }
   }
 
   func setString(_ value: String, forKey key: String) {
@@ -116,13 +112,13 @@ final class FileStorage: Pug.Storage, @unchecked Sendable {
 
   private func change(_ key: String, to value: String?) {
     assert(scheduler.isOnWorker)
-    if let current = values[key], current == value {
+    if let current = values[key], current?.isUTF8Equal(value) ?? (value == nil) {
       return
     }
     values.updateValue(value, forKey: key)
     unsynced.insert(key)
     guard scheduledSync == nil else { return }
-    scheduledSync = scheduler.runAfter(milliseconds: Self.syncDelayMillis) { [weak self] in
+    scheduledSync = scheduler.runAfter(milliseconds: delayMillis) { [weak self] in
       self?.sync()
     }
   }
