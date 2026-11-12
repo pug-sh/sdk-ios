@@ -55,8 +55,9 @@ make check-ios   # macOS: build and tests on the Mac, build-ios, the tests on an
 ```
 
 Work is done when `make check` passes, and `make check-ios` on a Mac. CI (`.github/workflows/ci.yml`)
-runs `make docker-ci` on Linux, `make check-ios` on macOS 26, and `make build-ios` under Xcode 16.0,
-the oldest Xcode supported.
+runs `make docker-ci` on Linux, `make check-ios` on macOS 26, and under Xcode 16.0, the oldest Xcode
+supported, builds the SDK for an iOS device with SwiftPM: the macOS 15 image no longer has the iOS
+platform that xcodebuild needs for that Xcode.
 
 `proto/` is vendored from the Buf Schema Registry at the commit pinned in the `Makefile`, the same
 as sdk-android's. Never edit it by hand: bump `PROTO_COMMIT`, run `make sync-protos protos` and
@@ -87,7 +88,9 @@ review the diff. `make check-proto-pin` proves `proto/` matches the pin.
   stub (`StubServer`); Linux's FoundationNetworking traps when one redirects, so the refusal of
   redirects is checked at the session delegate. `FakePlatform` drives the app's lifecycle; tests
   that run what it posts to the main thread are `@MainActor`. `UIKitPlatformTests` runs on the iOS
-  simulator only, without a host app, so `UIApplication` is absent there.
+  simulator only, without a host app, so `UIApplication` is absent there. Swift Testing logs every
+  argument in full, and GitHub's runner takes minutes over one long line, so a large input is built
+  in the test from a small argument, as `SHA256Tests` does with its million a's.
 - `Sources/Pug/Generated/`: `Pug.Events`, `Pug.TrackNamespace` and `WellKnownEvents`, written by
   `Tools/gen-track` from a protoc descriptor set of `proto/common/events/v1`. Never edited: change the
   generator and run `make typed-track`. `WellKnownEventsTests` checks them against `events.binpb`.

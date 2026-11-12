@@ -124,16 +124,16 @@ check: verify-version lint build test
 
 ci: protos check-codegen check
 
-# macOS only, from here to the Docker targets: the SDK for an iOS device with warnings as errors (the
-# CI floor job runs it under Xcode 16.0), the tests on an iOS simulator, and under Thread Sanitizer.
-IOS_SIMULATOR = $(shell xcrun simctl list devices available | sed -n 's/^ *iPhone[^(]*(\([0-9A-F-]\{36\}\)).*/\1/p' | head -n 1)
-
+# macOS only, from here to the Docker targets: the SDK for an iOS device with warnings as errors, the
+# tests on the first iPhone simulator available, and under Thread Sanitizer.
 build-ios:
 	xcodebuild build -quiet -scheme Pug -destination 'generic/platform=iOS' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
 
+# In the recipe's shell rather than $(shell): make counts the sed expression's parentheses.
 test-ios:
-	@test -n "$(IOS_SIMULATOR)" || { echo "no iPhone simulator available"; exit 1; }
-	xcodebuild test -quiet -scheme Pug -destination 'platform=iOS Simulator,id=$(IOS_SIMULATOR)'
+	id="$$(xcrun simctl list devices available | sed -n 's/^ *iPhone[^(]*(\([0-9A-F-]\{36\}\)).*/\1/p' | head -n 1)"; \
+	test -n "$$id" || { echo "no iPhone simulator available"; exit 1; }; \
+	xcodebuild test -quiet -scheme Pug -destination "platform=iOS Simulator,id=$$id"
 
 tsan:
 	$(SWIFT) test --sanitize=thread

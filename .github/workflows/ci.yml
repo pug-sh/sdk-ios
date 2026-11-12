@@ -16,22 +16,36 @@ jobs:
   linux:
     name: Format, lint, codegen, test & build (Linux)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      # Mostly for protoc, which `make protos` builds from source: minutes on a cold cache.
-      - uses: actions/cache@v6
+      # Mostly for protoc, which `make protos` builds from source: most of a cold run. Saved whether
+      # or not the checks pass; a new Package.resolved starts from the last save for the same
+      # Dockerfile, so only a new Swift image builds everything again.
+      - uses: actions/cache/restore@v6
+        id: cache
         with:
           path: |
             .build
             Tools/.build
-          key: linux-${{ hashFiles('Tools/linux.Dockerfile', 'Package.resolved', 'Tools/Package.resolved') }}
+          key: linux-${{ hashFiles('Tools/linux.Dockerfile') }}-${{ hashFiles('Package.resolved', 'Tools/Package.resolved') }}
+          restore-keys: linux-${{ hashFiles('Tools/linux.Dockerfile') }}-
 
-      # The Swift 6.2 container of Tools/linux.Dockerfile, as `make docker-ci` runs it locally.
+      # The Swift 6.2 container of Tools/linux.Dockerfile, as `make docker-ci` runs it locally. Its
+      # timeout is short of the job's, so the cache is still saved when a cold build runs out of time.
       - run: make docker-ci
+        timeout-minutes: 40
+
+      - uses: actions/cache/save@v6
+        if: ${{ !cancelled() && steps.cache.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            .build
+            Tools/.build
+          key: ${{ steps.cache.outputs.cache-primary-key }}
 
       - name: Check for uncommitted changes
         run: test -z "$(git status --porcelain)" || { git status --short; exit 1; }
@@ -58,4 +72,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - run: make build-ios
+      # SwiftPM rather than `make build-ios`: the image no longer has Xcode 16.0's iOS 18.0 platform,
+      # without which xcodebuild will not build for a device, and SwiftPM needs only the SDK in Xcode.
+      - run: >-
+          swift build --target Pug --triple arm64-apple-ios --sdk "$(xcrun --sdk iphoneos --show-sdk-path)"
+          -Xswiftc -warnings-as-errors
