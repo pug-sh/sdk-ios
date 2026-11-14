@@ -364,7 +364,7 @@ answers still cover what your own events and traits carry, such as purchases or 
 ## Sample app
 
 [`Examples/PugSample`](Examples/PugSample) uses the SDK from UIKit and SwiftUI: custom and typed
-events, view controllers tracked as screens and a SwiftUI screen named with `Pug.screen`, identify,
+events, view controllers tracked as screens and a SwiftUI screen named with `pugScreen`, identify,
 reset and consent. Open `Examples/PugSample/PugSample.xcodeproj` in Xcode, run it on a simulator and
 watch Xcode's console. It runs in dry run, logging events without sending them, until you set a
 project in `Examples/PugSample/Local.xcconfig`, which Git ignores:
