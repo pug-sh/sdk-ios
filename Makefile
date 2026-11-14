@@ -162,11 +162,15 @@ build-sample:
 	xcodebuild build -quiet -project $(SAMPLE)/PugSample.xcodeproj -scheme PugSample \
 	  -destination 'generic/platform=iOS Simulator' SAMPLE_WARNINGS_AS_ERRORS=YES CODE_SIGNING_ALLOWED=NO
 
-# In the recipe's shell rather than $(shell): make counts the sed expression's parentheses.
+# In the recipe's shell rather than $(shell): make counts the sed expression's parentheses. -quiet hides Swift
+# Testing's issues, so a failure prints them from the result bundle.
+IOS_RESULTS := .build/test-ios.xcresult
 test-ios:
+	rm -rf $(IOS_RESULTS)
 	id="$$(xcrun simctl list devices available | sed -n 's/^ *iPhone[^(]*(\([0-9A-F-]\{36\}\)).*/\1/p' | head -n 1)"; \
 	test -n "$$id" || { echo "no iPhone simulator available"; exit 1; }; \
-	xcodebuild test -quiet -scheme Pug -destination "platform=iOS Simulator,id=$$id"
+	xcodebuild test -quiet -scheme Pug -destination "platform=iOS Simulator,id=$$id" -resultBundlePath $(IOS_RESULTS) \
+	  || { xcrun xcresulttool get test-results summary --path $(IOS_RESULTS); exit 1; }
 
 tsan:
 	$(SWIFT) test --sanitize=thread
