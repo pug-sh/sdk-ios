@@ -181,14 +181,14 @@ final class HTTPTransportTests {
   @Test("a server that never answers times out as a transient deadline, at the deadline")
   func silentServer() async throws {
     server.enqueue(.silence)
-    let started = DispatchTime.now()
 
     let error = try await failure(transport(timeoutMillis: 300))
 
+    // Only the transport's own deadline writes this message, so it shows the request ended at the deadline rather
+    // than at URLSession's 60 s idle timeout. A bound on the elapsed time fails on a loaded iOS simulator.
     #expect(error.code == .deadlineExceeded)
     #expect(error.message == "request timed out after 300 ms")
     #expect(!error.isPermanent)
-    #expect(DispatchTime.now().uptimeNanoseconds - started.uptimeNanoseconds < 3_000_000_000)
   }
 
   @Test("a response that stalls times out")
