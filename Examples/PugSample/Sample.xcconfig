@@ -1,0 +1,15 @@
+// The sample's settings. Set your own in Local.xcconfig next to this file, which Git ignores: a project to send
+// events to, and a team to sign with for a device. In this file `//` starts a comment, so a URL is written with
+// `$()` between its slashes: https:/$()/api.pugs.dev.
+
+PRODUCT_BUNDLE_IDENTIFIER = sh.pug.sample
+DEVELOPMENT_TEAM =
+
+// Without an API key the sample runs in dry run, logging events without sending them.
+PUG_PROJECT_ID = sample-project
+PUG_API_KEY =
+// Empty for Pug's default, https://api.pugs.dev. App Transport Security lets the sample use http on the local
+// network, such as http:/$()/localhost:8080 for a backend on the Mac that runs the simulator.
+PUG_ENDPOINT =
+
+#include? "Local.xcconfig"

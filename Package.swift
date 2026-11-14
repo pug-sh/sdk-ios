@@ -17,7 +17,8 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-protobuf.git", exact: "1.37.0")
   ],
   targets: [
-    .target(name: "Pug", swiftSettings: swiftSettings),
+    // The privacy manifest lands in the app as a resource bundle, where Xcode's privacy report finds it.
+    .target(name: "Pug", resources: [.copy("PrivacyInfo.xcprivacy")], swiftSettings: swiftSettings),
     .testTarget(
       name: "PugTests",
       dependencies: ["Pug", .product(name: "SwiftProtobuf", package: "swift-protobuf")],

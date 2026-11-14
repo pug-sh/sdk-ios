@@ -27,7 +27,7 @@ a version a `Package.resolved` pins:
   resolve it, since SwiftPM skips the test-only dependencies of a dependency.
 - `Tools/` is a separate package for the development tools, never a dependency of `Pug`. It pins
   SwiftLint (SwiftLintPlugins, the official binary), which the Makefile runs through its command
-  plugin.
+  plugin, and holds gen-track and api-dump.
 - swift-format is the toolchain's `swift format`. CI's Swift 6.2 formats; another version can format
   differently.
 - buf is needed only to re-vendor `proto/` (`brew install bufbuild/buf/buf`).
@@ -38,26 +38,32 @@ container (`Tools/linux.Dockerfile`, the Swift 6.2 image plus make): `make docke
 (`Tools/xtool.Dockerfile`, Swift 6.4): `make xtool-sdk XIP=/path/to/Xcode.xip` installs the Darwin
 Swift SDK into `~/.swiftpm` once, from an Xcode.xip downloaded with an Apple ID (xtool 1.24's docs
 name 27.1; 27.2 works too); then `make xtool-build-ios` builds the SDK for an iOS device and the
-tests for the simulator, which it cannot run.
+tests for the simulator, which it cannot run, and typechecks the sample app's sources.
 
 ## Commands
 
 ```bash
-make check       # verify-version + swift format lint + SwiftLint + em dash check + build + tests,
-                 # warnings as errors
+make check       # verify-version + swift format lint + SwiftLint + em dash check + build + api-check
+                 # + tests, warnings as errors
 make fmt         # swift format, in place
+make api-dump    # rewrite api/Pug.api after a change to the public API, to review and commit with it
 make protos      # regenerate from proto/: the reference messages, Tests/PugTests/Resources/events.binpb
                  # and the typed track API (make typed-track)
 make ci          # protos + check-codegen + check: what the Linux CI job runs
 make build-ios   # macOS: the SDK for an iOS device, warnings as errors
-make check-ios   # macOS: build and tests on the Mac, build-ios, the tests on an iOS simulator, and
-                 # under Thread Sanitizer
+make check-ios   # macOS: build and tests on the Mac, build-ios, the sample app for the simulator, the
+                 # tests on an iOS simulator, and under Thread Sanitizer
 ```
 
 Work is done when `make check` passes, and `make check-ios` on a Mac. CI (`.github/workflows/ci.yml`)
 runs `make docker-ci` on Linux, `make check-ios` on macOS 26, and under Xcode 16.0, the oldest Xcode
 supported, builds the SDK for an iOS device with SwiftPM: the macOS 15 image no longer has the iOS
 platform that xcodebuild needs for that Xcode.
+
+A release is a tag `X.Y.Z` (no `v`), pushed once `sdkVersion` and the README's install line name
+it. `.github/workflows/release.yml` then checks the tag against them, runs `check-proto-pin` and the
+CI jobs on the tagged commit, and creates the GitHub release. SwiftPM serves the tag; nothing is
+uploaded.
 
 `proto/` is vendored from the Buf Schema Registry at the commit pinned in the `Makefile`, the same
 as sdk-android's. Never edit it by hand: bump `PROTO_COMMIT`, run `make sync-protos protos` and
@@ -94,7 +100,22 @@ review the diff. `make check-proto-pin` proves `proto/` matches the pin.
 - `Sources/Pug/Generated/`: `Pug.Events`, `Pug.TrackNamespace` and `WellKnownEvents`, written by
   `Tools/gen-track` from a protoc descriptor set of `proto/common/events/v1`. Never edited: change the
   generator and run `make typed-track`. `WellKnownEventsTests` checks them against `events.binpb`.
-- `Tools/`: development tools, a package of its own: SwiftLint and gen-track.
+- `Sources/Pug/PrivacyInfo.xcprivacy`: the privacy manifest, a resource of the target. It declares
+  the data the SDK collects (product interaction, the user id, the anonymous id as a device id) and
+  no required-reason API: update it when the SDK collects something new or starts calling one, such
+  as `UserDefaults` or a file's dates.
+- `api/Pug.api`: the public API, as `Tools/api-dump` renders the symbol graph of the module `build`
+  compiled; `api-check` fails while it is out of date. Written by CI's Swift 6.2, since compilers
+  print some declarations differently. Symbol graphs leave `@Sendable` out of closure types, so the
+  file does not show it.
+- `Examples/PugSample/`: the sample app, a reference for the developers who integrate the SDK, so
+  it stays small: a UIKit app with a SwiftUI screen, using each API once. The extensive device
+  checks belong to a test app of its own outside this repo, as `../sdk-android-testapp` is for
+  Android. An Xcode 16 project with a synchronized folder, so files added to `PugSample/` need no
+  project edit; the SDK is a local package (`../..`). `Sample.xcconfig` and the ignored
+  `Local.xcconfig` reach the code through `Info.plist`. Only Xcode builds it (`make build-sample`);
+  `make xtool-build-ios` typechecks its sources on Linux.
+- `Tools/`: development tools, a package of its own: SwiftLint, gen-track and api-dump.
 - `proto/`: vendored, see above.
 
 ## Invariants
@@ -103,7 +124,9 @@ review the diff. `make check-proto-pin` proves `proto/` matches the pin.
   No `!`, `try!`, `as!`, `fatalError`, `precondition` or `unowned` (SwiftLint fails on each), and no
   unchecked conversion or arithmetic on host or stored values: `Int64(exactly:)`, the
   overflow-reporting operators, restored times range-checked first. `assert` is allowed, since
-  release builds drop it. The only host-facing throw is `Pug.initialize` argument validation.
+  release builds drop it. The only host-facing throw is `Pug.initialize` argument validation. Never
+  read `Bundle.module`: SwiftPM's accessor for the privacy manifest's bundle traps when it is
+  missing.
 - **No runtime dependencies:** Foundation, UIKit, Network and os only, hence a hand-rolled protobuf
   codec and JSON writer. Never add a dependency to the `Pug` target.
 - **Never block the caller's thread, and no I/O on the main thread.**

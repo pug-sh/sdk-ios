@@ -3,7 +3,7 @@
 # tools come through SwiftPM, pinned by Package.resolved and Tools/Package.resolved, except Swift
 # itself and buf, which only re-vendoring proto/ needs.
 
-.PHONY: sync-protos proto-latest check-proto-pin protos protoc reference descriptors typed-track check-codegen verify-version fmt lint build test check ci build-ios test-ios tsan check-ios docker-image xtool-image xtool-sdk xtool-build-ios
+.PHONY: sync-protos proto-latest check-proto-pin protos protoc reference descriptors typed-track check-codegen verify-version fmt lint build test api-dump api-check check ci build-ios test-ios build-sample tsan check-ios docker-image xtool-image xtool-sdk xtool-build-ios
 
 # `ci` must run `protos` before `check-codegen` diffs the generated files. Keep everything serial
 # even under `make -jN`.
@@ -37,7 +37,7 @@ GENERATED := $(REFERENCE) $(EVENT_DESCRIPTORS) $(TYPED_TRACK)
 WELL_KNOWN_TYPES := .build/checkouts/swift-protobuf/Protos/Sources/SwiftProtobuf
 # What swift-format owns. The reference messages opt out with a swift-format-ignore-file comment;
 # gen-track writes what swift-format would.
-FORMATTED := Package.swift Tools/Package.swift Tools/Sources Sources Tests
+FORMATTED := Package.swift Tools/Package.swift Tools/Sources Sources Tests Examples
 WARNINGS_AS_ERRORS := -Xswiftc -warnings-as-errors
 EM_DASH := $(shell printf '\342\200\224')
 
@@ -96,12 +96,14 @@ check-codegen:
 	  || { git status --short -- $(GENERATED); echo "codegen drift: run 'make protos' and commit"; exit 1; }
 
 # $sdkVersion and the User-Agent come from sdkVersion in Version.swift, which the README's install
-# line and the release tag must name too.
+# line and the release tag must name too: the release workflow passes the tag as RELEASE_TAG.
 verify-version:
 	@version="$$(sed -n 's/^let sdkVersion = "\(.*\)"$$/\1/p' Sources/Pug/Version.swift)"; \
 	test -n "$$version" || { echo "no sdkVersion in Sources/Pug/Version.swift"; exit 1; }; \
 	grep -qF ".package(url: \"https://github.com/pug-sh/sdk-ios.git\", from: \"$$version\")" README.md \
-	  || { echo "README.md does not install $$version"; exit 1; }
+	  || { echo "README.md does not install $$version"; exit 1; }; \
+	test -z "$(RELEASE_TAG)" || test "$(RELEASE_TAG)" = "$$version" \
+	  || { echo "The tag $(RELEASE_TAG) does not match sdkVersion $$version"; exit 1; }
 
 fmt:
 	$(SWIFT) format --in-place --parallel --recursive $(FORMATTED)
@@ -120,14 +122,43 @@ build:
 test:
 	$(SWIFT) test $(WARNINGS_AS_ERRORS)
 
-check: verify-version lint build test
+# The public API, as api/Pug.api records it: Tools/api-dump renders the symbol graph of the module
+# `build` compiled. After a change to the API, `make api-dump` rewrites the file, to review and commit
+# with the change; `api-check` fails until then. CI's Swift 6.2 writes it, since compilers print some
+# declarations differently.
+API := api/Pug.api
+API_DUMP := .build/api-dump
+DUMP_API = rm -rf $(API_DUMP) && mkdir -p $(API_DUMP) $(dir $(1)) \
+  && bin="$$($(SWIFT) build --show-bin-path)" \
+  && triple="$$($(SWIFT) -print-target-info | sed -n 's/^ *"triple": "\(.*\)",$$/\1/p' | head -n 1)" \
+  && sdk="$$(xcrun --show-sdk-path 2>/dev/null || true)" \
+  && $(SWIFT) symbolgraph-extract -module-name Pug -target "$$triple" $${sdk:+-sdk "$$sdk"} -I "$$bin/Modules" \
+    -minimum-access-level public -skip-synthesized-members -output-dir $(API_DUMP) \
+  && $(SWIFT) run --package-path Tools -c release api-dump $(API_DUMP)/Pug.symbols.json $(1)
+
+api-dump: build
+	$(call DUMP_API,$(API))
+
+api-check: build
+	$(call DUMP_API,$(API_DUMP)/Pug.api)
+	@diff -u $(API) $(API_DUMP)/Pug.api \
+	  || { echo "The public API is not what $(API) records: review the diff, run 'make api-dump' and commit it."; \
+	    exit 1; }
+
+check: verify-version lint build api-check test
 
 ci: protos check-codegen check
 
 # macOS only, from here to the Docker targets: the SDK for an iOS device with warnings as errors, the
-# tests on the first iPhone simulator available, and under Thread Sanitizer.
+# sample app, the tests on the first iPhone simulator available, and under Thread Sanitizer.
+SAMPLE := Examples/PugSample
 build-ios:
 	xcodebuild build -quiet -scheme Pug -destination 'generic/platform=iOS' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+
+# The sample app for the simulator, which needs no signing.
+build-sample:
+	xcodebuild build -quiet -project $(SAMPLE)/PugSample.xcodeproj -scheme PugSample \
+	  -destination 'generic/platform=iOS Simulator' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES CODE_SIGNING_ALLOWED=NO
 
 # In the recipe's shell rather than $(shell): make counts the sed expression's parentheses.
 test-ios:
@@ -138,7 +169,7 @@ test-ios:
 tsan:
 	$(SWIFT) test --sanitize=thread
 
-check-ios: build test build-ios test-ios tsan
+check-ios: build test build-ios build-sample test-ios tsan
 
 # The Linux CI job's container, for a host without Swift: `make docker-<target>` runs `make <target>`
 # in it, as in `make docker-check` or `make docker-fmt`.
@@ -172,7 +203,14 @@ xtool-sdk: xtool-image
 	mkdir -p "$(HOME)/.swiftpm"
 	$(XTOOL_RUN) --volume "$(abspath $(XIP)):/tmp/Xcode.xip:ro" $(XTOOL_IMAGE) xtool sdk install --slim /tmp/Xcode.xip
 
+# Then the sample's sources are typechecked against the SDK built for a device: only Xcode builds
+# the app.
 xtool-build-ios: xtool-image
 	mkdir -p "$(HOME)/.swiftpm"
 	$(XTOOL_BUILD) --triple arm64-apple-ios --target Pug
 	$(XTOOL_BUILD) --triple arm64-apple-ios-simulator --build-tests
+	$(XTOOL_RUN) $(XTOOL_IMAGE) swiftc -typecheck -parse-as-library -swift-version 6 -warnings-as-errors \
+	  -target arm64-apple-ios15.0 -sdk $(XTOOL_SDK)/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk \
+	  -resource-dir $(XTOOL_SDK)/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift \
+	  -Xfrontend -enable-cross-import-overlays -I .build/xtool/out/Products/Debug-iphoneos \
+	  $(wildcard $(SAMPLE)/PugSample/*.swift)

@@ -1,0 +1,320 @@
+enum Pug {
+  static let track: Pug.TrackNamespace
+  static var isConsentPending: Bool { get }
+  static var isTrackingEnabled: Bool { get }
+  static var trackingConsent: Pug.TrackingConsent? { get }
+  static func destroy()
+  static func flush()
+  static func identify(_ externalId: String, traits: [String : Any]? = nil)
+  static func initialize(projectId: String, options: Pug.Options) throws(Pug.ConfigurationError)
+  static func optInTracking()
+  static func optOutTracking()
+  static func reset()
+  static func rotateSession()
+  static func screen(_ name: String)
+  static func track(_ kind: String, properties: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  static func whenConsentReady(_ callback: @escaping @MainActor () -> Void)
+}
+
+struct Pug.ConfigurationError : CustomStringConvertible, Equatable, Error, Hashable, LocalizedError, Sendable {
+  let message: String
+  var description: String { get }
+  var errorDescription: String? { get }
+}
+
+enum Pug.Events {
+  static let addToCart: String
+  static let apiKeyCreated: String
+  static let apiKeyRevoked: String
+  static let appBackgrounded: String
+  static let appClose: String
+  static let appCrashed: String
+  static let appForegrounded: String
+  static let appInstall: String
+  static let appOpen: String
+  static let appUpdate: String
+  static let audioCompleted: String
+  static let audioPause: String
+  static let audioPlay: String
+  static let audioSeeked: String
+  static let audioStarted: String
+  static let cartViewed: String
+  static let chatArchived: String
+  static let chatAttachmentDownloaded: String
+  static let chatAttachmentUploaded: String
+  static let chatCallJoined: String
+  static let chatCallLeft: String
+  static let chatCallRecordingStarted: String
+  static let chatCallScreenShared: String
+  static let chatCallStarted: String
+  static let chatCreated: String
+  static let chatDeleted: String
+  static let chatJoined: String
+  static let chatLeft: String
+  static let chatMemberAdded: String
+  static let chatMemberMuted: String
+  static let chatMemberRemoved: String
+  static let chatMemberRoleChanged: String
+  static let chatMessageDeleted: String
+  static let chatMessageEdited: String
+  static let chatMessageFailed: String
+  static let chatMessagePinned: String
+  static let chatMessageRead: String
+  static let chatMessageReceived: String
+  static let chatMessageSent: String
+  static let chatMessageUnpinned: String
+  static let chatReactionAdded: String
+  static let chatReactionRemoved: String
+  static let chatTypingStarted: String
+  static let chatTypingStopped: String
+  static let chatUnarchived: String
+  static let chatUserBlocked: String
+  static let checkoutStarted: String
+  static let checkoutStepCompleted: String
+  static let couponApplied: String
+  static let couponRemoved: String
+  static let emailVerified: String
+  static let errorOccurred: String
+  static let exportCompleted: String
+  static let exportStarted: String
+  static let featureUsed: String
+  static let feedbackSubmitted: String
+  static let fileDownloaded: String
+  static let fileUploaded: String
+  static let filterApplied: String
+  static let formStart: String
+  static let formSubmit: String
+  static let helpArticleViewed: String
+  static let integrationConnected: String
+  static let integrationDisconnected: String
+  static let inviteAccepted: String
+  static let inviteSent: String
+  static let invoiceFailed: String
+  static let invoicePaid: String
+  static let mfaDisabled: String
+  static let mfaEnabled: String
+  static let notificationClicked: String
+  static let notificationDismissed: String
+  static let notificationReceived: String
+  static let npsSubmitted: String
+  static let orderRefunded: String
+  static let passwordResetCompleted: String
+  static let passwordResetRequested: String
+  static let paymentFailed: String
+  static let paymentMethodAdded: String
+  static let paymentMethodRemoved: String
+  static let paymentSucceeded: String
+  static let productListViewed: String
+  static let productViewed: String
+  static let purchase: String
+  static let recommendationClicked: String
+  static let recommendationViewed: String
+  static let refundFailed: String
+  static let removeFromCart: String
+  static let screenView: String
+  static let scroll: String
+  static let search: String
+  static let searchResultClicked: String
+  static let share: String
+  static let signin: String
+  static let signout: String
+  static let signup: String
+  static let sortChanged: String
+  static let subscriptionCanceled: String
+  static let subscriptionChanged: String
+  static let subscriptionPaused: String
+  static let subscriptionRenewed: String
+  static let subscriptionResumed: String
+  static let subscriptionStarted: String
+  static let subscriptionTrialWillEnd: String
+  static let supportChatStarted: String
+  static let supportTicketCreated: String
+  static let supportTicketResolved: String
+  static let surveyCompleted: String
+  static let surveyStarted: String
+  static let trialConverted: String
+  static let trialStarted: String
+  static let videoCompleted: String
+  static let videoPause: String
+  static let videoPlay: String
+  static let videoSeeked: String
+  static let videoStarted: String
+  static let wishlistAdded: String
+  static let wishlistRemoved: String
+  static let workspaceCreated: String
+  static let workspaceDeleted: String
+  static let workspaceJoined: String
+  static let workspaceRoleChanged: String
+  static let workspaceSettingsUpdated: String
+}
+
+protocol Pug.Logger : Sendable {
+  func debug(_ message: String)
+  func error(_ message: String, error: (any Error)?)
+  func warning(_ message: String, error: (any Error)?)
+}
+
+final class Pug.MemoryStorage : Pug.Storage, Sendable {
+  init()
+  func removeValue(forKey key: String)
+  func setString(_ value: String, forKey key: String)
+  func string(forKey key: String) -> String?
+}
+
+struct Pug.Options : Sendable {
+  init(apiKey: String)
+  var apiKey: String
+  var autoInstallEvents: Bool
+  var autoOpenCloseEvents: Bool
+  var autoScreenViews: Bool
+  var batchMaxQueueSize: Int
+  var batchMaxSize: Int
+  var batchMaxWait: TimeInterval
+  var debug: Bool
+  var defaultTrackingConsent: Pug.TrackingConsent
+  var dryRun: Bool
+  var endpoint: URL
+  var logger: (any Pug.Logger)?
+  var persistTrackingConsent: Bool
+  var sessionIdleTimeout: TimeInterval
+  var sessionMaxDuration: TimeInterval
+  var storage: (any Pug.Storage)?
+}
+
+protocol Pug.Storage : Sendable {
+  func removeValue(forKey key: String) throws
+  func setString(_ value: String, forKey key: String) throws
+  func string(forKey key: String) throws -> String?
+}
+
+struct Pug.TrackNamespace : Sendable {
+  func addToCart(productId: String, price: Double? = nil, currency: String? = nil, cartId: String? = nil, quantity: Int? = nil, category: String? = nil, brand: String? = nil, sku: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func apiKeyCreated(apiKeyId: String? = nil, name: String? = nil, scope: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func apiKeyRevoked(apiKeyId: String? = nil, name: String? = nil, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func appBackgrounded(extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func appCrashed(errorMessage: String? = nil, errorType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func appForegrounded(extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func audioCompleted(audioId: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func audioPause(audioId: String, position: TimeInterval? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func audioPlay(audioId: String, position: TimeInterval? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func audioSeeked(audioId: String, fromPosition: TimeInterval? = nil, toPosition: TimeInterval? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func audioStarted(audioId: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func cartViewed(cartId: String? = nil, itemCount: Int? = nil, amount: Double? = nil, currency: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatArchived(conversationId: String, conversationType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatAttachmentDownloaded(conversationId: String, messageId: String? = nil, attachmentId: String, attachmentType: String? = nil, sizeBytes: Int? = nil, threadId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatAttachmentUploaded(conversationId: String, messageId: String? = nil, attachmentId: String, attachmentType: String? = nil, sizeBytes: Int? = nil, threadId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatCallJoined(conversationId: String, callId: String, callType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatCallLeft(conversationId: String, callId: String, callType: String? = nil, duration: TimeInterval? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatCallRecordingStarted(conversationId: String, callId: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatCallScreenShared(conversationId: String, callId: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatCallStarted(conversationId: String, callId: String, callType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatCreated(conversationId: String, conversationType: String? = nil, participantCount: Int? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatDeleted(conversationId: String, conversationType: String? = nil, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatJoined(conversationId: String, conversationType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatLeft(conversationId: String, conversationType: String? = nil, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatMemberAdded(conversationId: String, memberId: String, role: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatMemberMuted(conversationId: String, memberId: String, muteDuration: TimeInterval? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatMemberRemoved(conversationId: String, memberId: String, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatMemberRoleChanged(conversationId: String, memberId: String, previousRole: String? = nil, newRole: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatMessageDeleted(conversationId: String, messageId: String? = nil, conversationType: String? = nil, reason: String? = nil, threadId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatMessageEdited(conversationId: String, messageId: String? = nil, conversationType: String? = nil, threadId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatMessageFailed(conversationId: String, messageId: String? = nil, conversationType: String? = nil, reason: String, threadId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatMessagePinned(conversationId: String, messageId: String? = nil, conversationType: String? = nil, threadId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatMessageRead(conversationId: String, messageId: String? = nil, conversationType: String? = nil, threadId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatMessageReceived(conversationId: String, messageId: String? = nil, conversationType: String? = nil, messageType: String? = nil, characterCount: Int? = nil, attachmentCount: Int? = nil, threadId: String? = nil, parentMessageId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatMessageSent(conversationId: String, messageId: String? = nil, conversationType: String? = nil, messageType: String? = nil, characterCount: Int? = nil, attachmentCount: Int? = nil, threadId: String? = nil, parentMessageId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatMessageUnpinned(conversationId: String, messageId: String? = nil, conversationType: String? = nil, threadId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatReactionAdded(conversationId: String, messageId: String? = nil, reaction: String, threadId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatReactionRemoved(conversationId: String, messageId: String? = nil, reaction: String, threadId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatTypingStarted(conversationId: String, conversationType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatTypingStopped(conversationId: String, conversationType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatUnarchived(conversationId: String, conversationType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func chatUserBlocked(userId: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func checkoutStarted(productId: String? = nil, amount: Double? = nil, currency: String? = nil, cartId: String? = nil, checkoutId: String? = nil, itemCount: Int? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func checkoutStepCompleted(checkoutId: String, step: String, stepIndex: Int? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func couponApplied(couponId: String, couponCode: String? = nil, cartId: String? = nil, discountAmount: Double? = nil, currency: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func couponRemoved(couponId: String, couponCode: String? = nil, cartId: String? = nil, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func emailVerified(extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func errorOccurred(errorCode: String, message: String? = nil, severity: String? = nil, unhandled: Bool? = nil, stack: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func exportCompleted(exportId: String, exportType: String? = nil, sizeBytes: Int? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func exportStarted(exportId: String, exportType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func featureUsed(featureId: String, featureName: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func feedbackSubmitted(feedbackId: String? = nil, category: String? = nil, comment: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func fileDownloaded(fileId: String, fileName: String? = nil, fileType: String? = nil, sizeBytes: Int? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func fileUploaded(fileId: String, fileName: String? = nil, fileType: String? = nil, sizeBytes: Int? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func filterApplied(key: String, value: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func formStart(formId: String, formName: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func formSubmit(formId: String, formName: String? = nil, action: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func helpArticleViewed(articleId: String, articleTitle: String? = nil, category: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func integrationConnected(integrationId: String? = nil, integrationType: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func integrationDisconnected(integrationId: String? = nil, integrationType: String, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func inviteAccepted(inviteId: String? = nil, workspaceId: String? = nil, inviterId: String? = nil, inviteeId: String? = nil, inviteeEmail: String? = nil, role: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func inviteSent(inviteId: String? = nil, workspaceId: String? = nil, inviterId: String? = nil, inviteeId: String? = nil, inviteeEmail: String? = nil, role: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func invoiceFailed(invoiceId: String, subscriptionId: String? = nil, amount: Double? = nil, currency: String? = nil, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func invoicePaid(invoiceId: String, subscriptionId: String? = nil, amount: Double? = nil, currency: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func mfaDisabled(method: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func mfaEnabled(method: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func notificationClicked(campaignId: String, notificationType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func notificationDismissed(campaignId: String, notificationType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func notificationReceived(campaignId: String, notificationType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func npsSubmitted(score: Int? = nil, comment: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func orderRefunded(orderId: String, amount: Double? = nil, currency: String? = nil, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func passwordResetCompleted(extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func passwordResetRequested(extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func paymentFailed(paymentId: String? = nil, invoiceId: String? = nil, subscriptionId: String? = nil, amount: Double? = nil, currency: String? = nil, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func paymentMethodAdded(paymentMethodId: String? = nil, paymentMethodType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func paymentMethodRemoved(paymentMethodId: String? = nil, paymentMethodType: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func paymentSucceeded(paymentId: String? = nil, invoiceId: String? = nil, subscriptionId: String? = nil, amount: Double? = nil, currency: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func productListViewed(listId: String, listName: String? = nil, category: String? = nil, itemCount: Int? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func productViewed(productId: String, productName: String? = nil, category: String? = nil, brand: String? = nil, sku: String? = nil, price: Double? = nil, currency: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func purchase(productId: String? = nil, amount: Double? = nil, currency: String? = nil, orderId: String? = nil, quantity: Int? = nil, category: String? = nil, brand: String? = nil, sku: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func recommendationClicked(recommendationId: String, itemId: String, source: String? = nil, index: Int? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func recommendationViewed(recommendationId: String, itemId: String? = nil, source: String? = nil, index: Int? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func refundFailed(orderId: String, refundId: String? = nil, amount: Double? = nil, currency: String? = nil, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func removeFromCart(productId: String, price: Double? = nil, currency: String? = nil, cartId: String? = nil, quantity: Int? = nil, category: String? = nil, brand: String? = nil, sku: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func scroll(percent: Int? = nil, scrollY: Int? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func search(query: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func searchResultClicked(query: String, resultId: String, index: Int? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func share(extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func signin(extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func signout(extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func signup(extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func sortChanged(key: String, direction: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func subscriptionCanceled(subscriptionId: String, planId: String? = nil, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func subscriptionChanged(subscriptionId: String, previousPlanId: String? = nil, newPlanId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func subscriptionPaused(subscriptionId: String, planId: String? = nil, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func subscriptionRenewed(subscriptionId: String, planId: String? = nil, amount: Double? = nil, currency: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func subscriptionResumed(subscriptionId: String, planId: String? = nil, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func subscriptionStarted(subscriptionId: String, planId: String? = nil, amount: Double? = nil, currency: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func subscriptionTrialWillEnd(subscriptionId: String, planId: String? = nil, trialId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func supportChatStarted(conversationId: String, topic: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func supportTicketCreated(ticketId: String, category: String? = nil, priority: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func supportTicketResolved(ticketId: String, resolution: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func surveyCompleted(surveyId: String, questionCount: Int? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func surveyStarted(surveyId: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func trialConverted(trialId: String? = nil, subscriptionId: String? = nil, planId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func trialStarted(trialId: String? = nil, planId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func videoCompleted(videoId: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func videoPause(videoId: String, position: TimeInterval? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func videoPlay(videoId: String, position: TimeInterval? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func videoSeeked(videoId: String, fromPosition: TimeInterval? = nil, toPosition: TimeInterval? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func videoStarted(videoId: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func wishlistAdded(productId: String, wishlistId: String? = nil, price: Double? = nil, currency: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func wishlistRemoved(productId: String, wishlistId: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func workspaceCreated(workspaceId: String, workspaceName: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func workspaceDeleted(workspaceId: String, reason: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func workspaceJoined(workspaceId: String, role: String? = nil, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func workspaceRoleChanged(workspaceId: String, memberId: String, previousRole: String? = nil, newRole: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+  func workspaceSettingsUpdated(workspaceId: String, setting: String, extras: [String : Any]? = nil, options: Pug.TrackOptions? = nil)
+}
+
+struct Pug.TrackOptions : Equatable, Hashable, Sendable {
+  init(immediate: Bool = false, timestamp: Date? = nil)
+  var immediate: Bool
+  var timestamp: Date?
+}
+
+enum Pug.TrackingConsent : Equatable, Hashable, Sendable {
+  case denied
+  case granted
+}

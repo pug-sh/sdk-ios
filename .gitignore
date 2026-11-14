@@ -3,3 +3,5 @@
 .DS_Store
 DerivedData/
 xcuserdata/
+# The sample's own settings: a project, an API key and a signing team.
+Examples/PugSample/Local.xcconfig
