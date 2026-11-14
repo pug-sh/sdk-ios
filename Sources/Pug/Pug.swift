@@ -29,7 +29,7 @@ public enum Pug {
   }
 
   /// Tracks a `screen_view` of the screen `name` unless it is the current one, and reports it as `$url` on the events
-  /// that follow. For screens that are not view controllers, such as SwiftUI views.
+  /// that follow. For a screen that is not a view controller; in SwiftUI, prefer `pugScreen(_:)`.
   public static func screen(_ name: String) {
     facade.screen(name)
   }

@@ -8,7 +8,7 @@ final class AppLifecycleTracker {
     weak var controller: AnyObject?
     weak var layer: AnyObject?
     let name: String
-    let screenClass: String
+    let screenClass: String?
   }
 
   // A screen left in view beneath a presentation, such as a sheet, whose dismissal UIKit reports to no view controller
@@ -54,8 +54,8 @@ final class AppLifecycleTracker {
   }
 
   /// `controller` is a view controller that is a screen, and `layer` the root of its hierarchy: the window's root view
-  /// controller, or a presented one.
-  func screenDidAppear(_ controller: AnyObject, layer: AnyObject, name: String, screenClass: String) {
+  /// controller, or a presented one. `screenClass` is nil for a named SwiftUI view.
+  func screenDidAppear(_ controller: AnyObject, layer: AnyObject, name: String, screenClass: String?) {
     guard !isStopped else { return }
     show(Screen(controller: controller, layer: layer, name: name, screenClass: screenClass))
   }

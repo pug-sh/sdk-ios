@@ -46,7 +46,7 @@ extension Pug {
     public var autoOpenCloseEvents = true
 
     /// Tracks a `screen_view` each time one of the app's own view controllers appears on a different screen. SwiftUI
-    /// screens are named with `Pug.screen(_:)`.
+    /// screens are named with `pugScreen(_:)`, tracked either way.
     public var autoScreenViews = true
 
     /// Tracks `app_install` and `app_update` on the first launch of each app version.

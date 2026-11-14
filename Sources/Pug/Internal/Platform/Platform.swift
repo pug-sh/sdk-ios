@@ -18,8 +18,9 @@ protocol Platform: Sendable {
   /// Where the app was installed from, such as `com.apple`, or nil when that is not known. Called on the worker.
   func installSource() -> String?
 
-  /// Reports the app's lifecycle to `observer`, and with `screens` the view controllers that are screens, until the
-  /// returned handle is cancelled. Returns nil when there is no lifecycle to observe.
+  /// Reports the app's lifecycle to `observer`, the SwiftUI views the app names with `pugScreen(_:)` and, with
+  /// `screens`, the view controllers that are screens, until the returned handle is cancelled. Returns nil when there
+  /// is no lifecycle to observe.
   func observeLifecycle(_ observer: any LifecycleObserver, screens: Bool, logger: SafeLogger) -> (any Cancellable)?
 
   /// Runs `work` on the main thread later, even when called there.
@@ -45,9 +46,10 @@ protocol LifecycleObserver: Sendable {
   /// `settled` runs, on any thread, once what leaving the foreground sends has settled.
   func appDidEnterBackground(then settled: @escaping @Sendable () -> Void)
 
-  /// A view controller that is a screen appeared: `isReturning` when it is the one that appeared last.
-  func screenDidAppear(name: String, screenClass: String, isReturning: Bool)
+  /// A screen appeared, a view controller or a named SwiftUI view, which has no `screenClass`: `isReturning` when it is
+  /// the one that appeared last.
+  func screenDidAppear(name: String, screenClass: String?, isReturning: Bool)
 
-  /// The view controller that appeared last disappeared, covered by another or removed.
+  /// The screen that appeared last disappeared, covered by another or removed.
   func screenDidDisappear()
 }

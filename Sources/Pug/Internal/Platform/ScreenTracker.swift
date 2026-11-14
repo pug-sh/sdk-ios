@@ -4,15 +4,16 @@ import UIKit
 /// What `ScreenTracker` reports to, on the main thread.
 @MainActor
 protocol ScreenListener: AnyObject {
-  func viewControllerDidAppear(_ controller: UIViewController, name: String, screenClass: String)
+  /// `screenClass` is nil for a SwiftUI view that `pugScreen(_:)` names.
+  func viewControllerDidAppear(_ controller: UIViewController, name: String, screenClass: String?)
 
   func viewControllerDidDisappear(_ controller: UIViewController)
 }
 
 /// Finds the view controllers that are screens: those of the app's own classes, other than UIKit's containers, whose
 /// parent is none or one of those containers. Hooks `viewDidAppear(_:)` and `viewDidDisappear(_:)` of every view
-/// controller once per process, the first time a listener is set; the hooks stay, reporting to nothing while there is
-/// none.
+/// controller once per process, the first time they are asked for; the hooks stay, reporting nothing while they are
+/// not. The SwiftUI views that `pugScreen(_:)` names report through it either way.
 @MainActor
 final class ScreenTracker {
   struct Screen: Equatable {
@@ -22,14 +23,9 @@ final class ScreenTracker {
 
   static let shared = ScreenTracker()
 
-  /// Hears of the screens that appear and of every view controller that disappears.
-  weak var listener: (any ScreenListener)? {
-    didSet {
-      if listener != nil {
-        installHooks()
-      }
-    }
-  }
+  /// Hears of the screens that appear and of the view controllers that disappear, from `start` to `stop`.
+  private(set) weak var listener: (any ScreenListener)?
+  private var tracksViewControllers = false
 
   /// Where the app's own classes live: its executable and the frameworks it embeds.
   var appBundleURL = Bundle.main.bundleURL {
@@ -42,9 +38,34 @@ final class ScreenTracker {
   // By class, nil for one that is not the app's own.
   private var screens: [ObjectIdentifier: Screen?] = [:]
 
-  /// What `controller` reports as a screen, or nil when it is not one.
+  /// Reports to `listener` the SwiftUI views the app names and, with `viewControllers`, the view controllers.
+  func start(_ listener: any ScreenListener, viewControllers: Bool) {
+    self.listener = listener
+    tracksViewControllers = viewControllers
+    if viewControllers {
+      installHooks()
+    }
+  }
+
+  func stop(_ listener: any ScreenListener) {
+    guard self.listener === listener else { return }
+    self.listener = nil
+    tracksViewControllers = false
+  }
+
+  func namedScreenDidAppear(_ controller: NamedScreenController) {
+    listener?.viewControllerDidAppear(controller, name: controller.name, screenClass: nil)
+  }
+
+  func namedScreenDidDisappear(_ controller: NamedScreenController) {
+    listener?.viewControllerDidDisappear(controller)
+  }
+
+  /// What `controller` reports as a screen, or nil when it is not one. A named SwiftUI view reports itself.
   func screen(_ controller: UIViewController) -> Screen? {
-    guard !Self.isContainer(controller), controller.parent.map(Self.isContainer) ?? true else { return nil }
+    guard !(controller is NamedScreenController), !Self.isContainer(controller),
+      controller.parent.map(Self.isContainer) ?? true
+    else { return nil }
     let viewControllerClass: AnyClass = type(of: controller)
     let key = ObjectIdentifier(viewControllerClass)
     if let known = screens[key] {
@@ -73,11 +94,12 @@ final class ScreenTracker {
   }
 
   private func didAppear(_ controller: UIViewController) {
-    guard let listener, let screen = screen(controller) else { return }
+    guard tracksViewControllers, let listener, let screen = screen(controller) else { return }
     listener.viewControllerDidAppear(controller, name: screen.name, screenClass: screen.screenClass)
   }
 
   private func didDisappear(_ controller: UIViewController) {
+    guard tracksViewControllers, !(controller is NamedScreenController) else { return }
     listener?.viewControllerDidDisappear(controller)
   }
 

@@ -370,8 +370,7 @@ extension Client: LifecycleObserver {
     }
   }
 
-  func screenDidAppear(name: String, screenClass: String, isReturning: Bool) {
-    guard configuration.autoScreenViews else { return }
+  func screenDidAppear(name: String, screenClass: String?, isReturning: Bool) {
     let now = clock.nowMillis
     enqueue("Tracking a screen view") {
       $0.showAutoScreen(name, screenClass: screenClass, isReturning: isReturning, at: now)
@@ -379,7 +378,6 @@ extension Client: LifecycleObserver {
   }
 
   func screenDidDisappear() {
-    guard configuration.autoScreenViews else { return }
     enqueue("Tracking a screen leaving") { $0.hideAutoScreen() }
   }
 }

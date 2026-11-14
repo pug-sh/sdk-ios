@@ -339,6 +339,29 @@ final class ClientPlatformTests {
     #expect(try transport.batches.last?.single().autoProperties["$url"] == .string("Feed"))
   }
 
+  @Test("a SwiftUI view that pugScreen names is a screen like a view controller, with autoScreenViews off too")
+  func swiftUIScreen() throws {
+    let platform = FakePlatform()
+    let client = try makeClient(platform) {
+      $0.autoScreenViews = false
+      $0.batchMaxSize = 1
+    }
+
+    platform.showNamedScreen("Settings")
+    // Covered by a full-screen controller that is not a screen, then back.
+    platform.hideScreen()
+    platform.showNamedScreen("Settings", returning: true)
+    platform.showNamedScreen("Profile")
+    client.track("tap", properties: nil, options: nil)
+    scheduler.runCurrent()
+
+    let events = try transport.batches.map { try $0.single() }
+    #expect(events.map(\.kind) == ["screen_view", "screen_view", "tap"])
+    #expect(events[0].customProperties == ["screenName": .string("Settings")])
+    #expect(events[2].autoProperties["$url"] == .string("Profile"))
+    #expect(events[2].autoProperties["$referrer"] == .string("Settings"))
+  }
+
   @Test("a blank screen name is dropped and a long one cut short")
   func screenNames() throws {
     let client = try makeClient { $0.batchMaxSize = 1 }

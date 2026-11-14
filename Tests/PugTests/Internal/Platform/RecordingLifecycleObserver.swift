@@ -25,7 +25,7 @@ final class RecordingLifecycleObserver: LifecycleObserver {
     settles.withLock { $0.append(settled) }
   }
 
-  func screenDidAppear(name: String, screenClass: String, isReturning: Bool) {
+  func screenDidAppear(name: String, screenClass: String?, isReturning: Bool) {
     recorded.withLock { $0.append(.screen(name, returning: isReturning)) }
   }
 

@@ -1,7 +1,7 @@
 import Pug
 import SwiftUI
 
-/// A SwiftUI screen. Pug tracks view controllers, not SwiftUI views, so the view names its screen itself.
+/// A SwiftUI screen, which names itself: Pug tracks view controllers, not SwiftUI views.
 struct ConsentView: View {
   @StateObject private var consent = Consent()
 
@@ -16,7 +16,7 @@ struct ConsentView: View {
         Button("Opt out", role: .destructive) { consent.optOut() }
       }
     }
-    .onAppear { Pug.screen("Consent") }
+    .pugScreen("Consent")
   }
 }
 

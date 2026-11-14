@@ -153,13 +153,19 @@ final class FakePlatform: Platform {
   }
 
   /// A view controller of `screenClass`, module-qualified as `NSStringFromClass` names it, appears: `returning` when
-  /// it is the one that appeared last.
+  /// it is the one that appeared last. As on a device, only reported when the client asked for view controllers.
   func showScreen(_ screenClass: String, returning: Bool = false) {
+    guard let observer = observer(), observesScreens == true else { return }
     let name = screenClass.split(separator: ".").last.map(String.init) ?? screenClass
-    observer()?.screenDidAppear(name: name, screenClass: screenClass, isReturning: returning)
+    observer.screenDidAppear(name: name, screenClass: screenClass, isReturning: returning)
   }
 
-  /// The view controller that appeared last disappears.
+  /// A SwiftUI view that `pugScreen(_:)` names appears, reported whether or not the client asked for view controllers.
+  func showNamedScreen(_ name: String, returning: Bool = false) {
+    observer()?.screenDidAppear(name: name, screenClass: nil, isReturning: returning)
+  }
+
+  /// The screen that appeared last disappears.
   func hideScreen() {
     observer()?.screenDidDisappear()
   }

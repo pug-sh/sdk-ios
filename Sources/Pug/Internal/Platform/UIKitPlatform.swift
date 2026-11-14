@@ -148,9 +148,7 @@ private final class UIKitLifecycle: Cancellable, ScreenListener {
       observe(UIApplication.didBecomeActiveNotification) { $0.enterForeground() },
       observe(UIApplication.didEnterBackgroundNotification) { $0.enterBackground() },
     ]
-    if screens {
-      ScreenTracker.shared.listener = self
-    }
+    ScreenTracker.shared.start(self, viewControllers: screens)
     // A launch in the background, or one not yet active, waits for the notifications.
     if Self.isActive() {
       enterForeground()
@@ -161,7 +159,7 @@ private final class UIKitLifecycle: Cancellable, ScreenListener {
     onMain { self.stop() }
   }
 
-  func viewControllerDidAppear(_ controller: UIViewController, name: String, screenClass: String) {
+  func viewControllerDidAppear(_ controller: UIViewController, name: String, screenClass: String?) {
     Self.refresh(snapshot)
     tracker.screenDidAppear(controller, layer: Self.root(of: controller), name: name, screenClass: screenClass)
   }
@@ -200,9 +198,7 @@ private final class UIKitLifecycle: Cancellable, ScreenListener {
       NotificationCenter.default.removeObserver(observation)
     }
     observations = []
-    if ScreenTracker.shared.listener === self {
-      ScreenTracker.shared.listener = nil
-    }
+    ScreenTracker.shared.stop(self)
   }
 
   private func observe(

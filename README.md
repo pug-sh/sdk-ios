@@ -6,7 +6,7 @@ consent, and batched delivery that survives restarts and bad networks.
 - iOS and iPadOS 15 or newer, Mac Catalyst and iPad apps on a Mac included. Xcode 16 or newer;
   apps in the Swift 5 language mode can use it too, and Objective-C code through a Swift wrapper of
   its own.
-- Swift Package Manager only. No runtime dependencies: Foundation, UIKit, Network and os.
+- Swift Package Manager only. No runtime dependencies: Foundation, UIKit, SwiftUI, Network and os.
 - Ships a privacy manifest. Needs no permission, entitlement or App Tracking Transparency prompt.
 
 ## Install
@@ -185,17 +185,27 @@ ids, which the server deduplicates. An app that iOS launches in the background, 
 background fetch or a location update, tracks no `app_open`, `app_close` or `screen_view` until the
 user opens it; the events you track meanwhile are sent as usual.
 
-SwiftUI views are not view controllers, so name their screens with `Pug.screen`:
+SwiftUI views are not view controllers, so name a SwiftUI screen with `pugScreen`, on the view the
+screen shows, inside its `NavigationStack`:
 
 ```swift
-SettingsView()
-  .onAppear { Pug.screen("Settings") }
+NavigationStack {
+  List(products) { product in
+    NavigationLink(product.name) { ProductView(product: product) }
+  }
+  .pugScreen("Products")
+}
 ```
 
-It tracks a `screen_view` unless that screen is already the current one, and every event after it
-carries the screen as `$url` and the one before as `$referrer`. View controllers feed the same
-state. With `autoScreenViews` off, view controllers are left alone entirely, so the screens are only
-the ones you name.
+It is tracked as a view controller is, with `autoScreenViews` off too: a `screen_view` with its
+`screenName` and no `screenClass` when it appears on a different screen, and again when it comes
+back after another. Dismissing a sheet makes the screen beneath it current again, and a new name is
+a new screen. For a screen that is neither, call `Pug.screen("Level 3")`: it tracks a `screen_view`
+unless that screen is already the current one.
+
+Every event after a screen carries it as `$url` and the one before as `$referrer`. With
+`autoScreenViews` off, view controllers are left alone entirely, so the screens are only the ones
+you name.
 
 `app_install` is the first launch with the SDK on the device, so when an update of your app adds
 Pug, its existing users count as installs as they launch it. To see the first screen and `app_open`

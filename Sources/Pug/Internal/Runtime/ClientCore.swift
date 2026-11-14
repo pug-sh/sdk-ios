@@ -252,7 +252,7 @@ final class ClientCore: @unchecked Sendable {
     captureScreenView(shown, screenClass: screenClass, at: callTime)
   }
 
-  func showAutoScreen(_ name: String, screenClass: String, isReturning: Bool, at callTime: Int64) {
+  func showAutoScreen(_ name: String, screenClass: String?, isReturning: Bool, at callTime: Int64) {
     assert(scheduler.isOnWorker)
     defer {
       isAutoScreenHidden = false

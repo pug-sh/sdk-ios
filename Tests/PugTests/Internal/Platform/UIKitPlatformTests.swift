@@ -16,7 +16,7 @@ private final class RecordingListener: ScreenListener {
   var appeared: [String] = []
   var disappeared: [UIViewController] = []
 
-  func viewControllerDidAppear(_ controller: UIViewController, name: String, screenClass: String) {
+  func viewControllerDidAppear(_ controller: UIViewController, name: String, screenClass: String?) {
     appeared.append(name)
   }
 
@@ -80,8 +80,8 @@ struct UIKitPlatformTests {
   @Test("the hooks report the screens that appear and every view controller that disappears")
   func hooks() {
     let listener = RecordingListener()
-    tracker.listener = listener
-    defer { tracker.listener = nil }
+    tracker.start(listener, viewControllers: true)
+    defer { tracker.stop(listener) }
     let home = HomeViewController()
     let system = UIViewController()
 
@@ -93,6 +93,37 @@ struct UIKitPlatformTests {
     #expect(listener.appeared == ["HomeViewController"])
     #expect(listener.disappeared.count == 2)
     #expect(listener.disappeared.first === home)
+  }
+
+  @Test("the hooks leave a SwiftUI view that pugScreen names to report itself, once")
+  func namedScreenHooked() {
+    let listener = RecordingListener()
+    tracker.start(listener, viewControllers: true)
+    defer { tracker.stop(listener) }
+    let settings = NamedScreenController(name: "Settings")
+
+    settings.viewDidAppear(false)
+    settings.viewDidDisappear(false)
+
+    #expect(tracker.screen(settings) == nil)
+    #expect(listener.appeared == ["Settings"])
+    #expect(listener.disappeared.count == 1)
+  }
+
+  @Test("a SwiftUI view that pugScreen names is a screen with the view controller hooks off")
+  func namedScreen() async throws {
+    let observer = RecordingLifecycleObserver()
+    let observation = try #require(UIKitPlatform().observeLifecycle(observer, screens: false, logger: logger.safe()))
+    defer { observation.cancel() }
+    NotificationCenter.default.post(name: UIApplication.didBecomeActiveNotification, object: nil)
+    try await Task.sleep(nanoseconds: 100_000_000)
+    let settings = NamedScreenController(name: "Settings")
+
+    HomeViewController().viewDidAppear(false)
+    settings.viewDidAppear(false)
+    settings.viewDidDisappear(false)
+
+    #expect(observer.reported == [.foreground, .screen("Settings", returning: false), .screenLeft])
   }
 
   @Test("the app's notifications bring it to the foreground once, take it to the background, and stop with cancel")
