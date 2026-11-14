@@ -155,10 +155,12 @@ SAMPLE := Examples/PugSample
 build-ios:
 	xcodebuild build -quiet -scheme Pug -destination 'generic/platform=iOS' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
 
-# The sample app for the simulator, which needs no signing.
+# The sample app for the simulator, which needs no signing. The project turns SAMPLE_WARNINGS_AS_ERRORS into
+# warnings as errors for the sample's own code: Xcode builds the Pug package with its warnings suppressed, and
+# rejects both flags at once.
 build-sample:
 	xcodebuild build -quiet -project $(SAMPLE)/PugSample.xcodeproj -scheme PugSample \
-	  -destination 'generic/platform=iOS Simulator' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES CODE_SIGNING_ALLOWED=NO
+	  -destination 'generic/platform=iOS Simulator' SAMPLE_WARNINGS_AS_ERRORS=YES CODE_SIGNING_ALLOWED=NO
 
 # In the recipe's shell rather than $(shell): make counts the sed expression's parentheses.
 test-ios:
