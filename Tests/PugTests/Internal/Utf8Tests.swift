@@ -79,6 +79,18 @@ struct Utf8Tests {
     #expect(!"\u{E9}".hasUTF8Prefix("e"))
   }
 
+  @Test("UTF-8 equality compares bytes, where == takes canonically equivalent strings as equal")
+  func utf8Equality() {
+    #expect("caf\u{E9}".isUTF8Equal("caf\u{E9}"))
+    #expect("".isUTF8Equal(""))
+    #expect("caf\u{E9}" == "cafe\u{301}")
+    #expect(!"caf\u{E9}".isUTF8Equal("cafe\u{301}"))
+    #expect(!"abc".isUTF8Equal("abcd"))
+    #expect(!"abcd".isUTF8Equal("abc"))
+    #expect(!"abc".isUTF8Equal("abd"))
+    #expect(!"".isUTF8Equal(nil))
+  }
+
   @Test("entries sort by UTF-16 code units, where Swift's own order differs")
   func utf16KeyOrder() {
     let map = ["\u{FF5E}": 1, "\u{1F30D}": 2, "a": 3, "Z": 4, "\u{E9}": 5, "": 6]

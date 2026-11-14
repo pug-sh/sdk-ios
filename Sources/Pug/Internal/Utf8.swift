@@ -8,7 +8,9 @@ extension String {
   /// Whether the UTF-8 bytes are those of `other`, as the server compares strings. `==` takes canonically equivalent
   /// strings, such as "é" and "e\u{301}", as equal.
   func isUTF8Equal(_ other: String?) -> Bool {
-    guard let other else { return false }
+    // Lengths first: a queue grown by one event starts with the whole stored one, which elementsEqual alone would
+    // scan on every push.
+    guard let other, utf8.count == other.utf8.count else { return false }
     return utf8.elementsEqual(other.utf8)
   }
 
