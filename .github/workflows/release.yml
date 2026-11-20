@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -23,7 +23,7 @@ jobs:
 
       # The release gate that CI leaves out: proto/ must be what the pinned commit exports, which needs
       # buf and the Buf Schema Registry.
-      - uses: bufbuild/buf-action@v1
+      - uses: bufbuild/buf-action@37ac33d8960807670a6e9719080e885197b09cc6 # v1.7.0
         with:
           version: 1.75.0
           setup_only: true

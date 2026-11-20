@@ -1,0 +1,38 @@
+name: OSV-Scanner
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # Daily, for advisories published against dependencies that have not changed. Each failed run
+  # notifies whoever last edited the cron line.
+  schedule:
+    - cron: "14 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# The SDK ships no dependencies: the lockfiles scanned are Package.resolved, for the tests, and
+# Tools/Package.resolved. The commit pin does not cover the scanner, an image pulled by tag.
+jobs:
+  # Fails on any known vulnerability in the committed lockfiles and reports it in the Security tab.
+  scan:
+    if: github.event_name != 'pull_request'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+
+  # Fails only on vulnerabilities the pull request adds, which it annotates, so nothing is uploaded.
+  # The reusable workflow still asks for security-events: write, which the caller has to grant.
+  scan-pr:
+    if: github.event_name == 'pull_request'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+    with:
+      upload-sarif: false

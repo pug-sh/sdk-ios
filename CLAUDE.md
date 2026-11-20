@@ -61,6 +61,11 @@ runs `make docker-ci` on Linux, `make check-ios` on macOS 26, and under Xcode 16
 supported, builds the SDK for an iOS device with SwiftPM: the macOS 15 image no longer has the iOS
 platform that xcodebuild needs for that Xcode.
 
+`.github/workflows/osv-scanner.yml` runs OSV-Scanner over the committed `Package.resolved` files,
+which hold only the tests' and the tools' dependencies, since the SDK ships none. On a pull request
+it fails only on vulnerabilities the change adds; on pushes to main and daily it fails on any known
+one and reports it in the Security tab. The workflows pin actions by commit, which Dependabot moves.
+
 A release is a tag `X.Y.Z` (no `v`), pushed once `sdkVersion` and the README's install line name
 it. `.github/workflows/release.yml` then checks the tag against them, runs `check-proto-pin` and the
 CI jobs on the tagged commit, and creates the GitHub release. SwiftPM serves the tag; nothing is
