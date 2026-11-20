@@ -12,6 +12,13 @@ final class HTTPTransport: Transport {
 
   private static let userAgent = "pug-ios/\(sdkVersion)"
 
+  /// Starts a request's deadline. `dispatchDeadlineTimer` is the real one; a test can fire deadlines itself.
+  typealias DeadlineTimer = @Sendable (_ milliseconds: Int, _ expire: @escaping @Sendable () -> Void) -> Void
+
+  static let dispatchDeadlineTimer: DeadlineTimer = { milliseconds, expire in
+    DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(milliseconds)) { expire() }
+  }
+
   private let batchURL: URL?
   private let identifyURL: URL?
   private let apiKey: String
@@ -27,7 +34,8 @@ final class HTTPTransport: Transport {
     logger: SafeLogger,
     batchTimeoutMillis: Int = 10_000,
     identifyTimeoutMillis: Int = 15_000,
-    configuration: URLSessionConfiguration = .ephemeral
+    configuration: URLSessionConfiguration = .ephemeral,
+    deadlineTimer: @escaping DeadlineTimer = HTTPTransport.dispatchDeadlineTimer
   ) {
     var base = endpoint.absoluteString
     while base.hasSuffix("/") {
@@ -44,7 +52,7 @@ final class HTTPTransport: Transport {
     configuration.httpShouldSetCookies = false
     configuration.urlCache = nil
     configuration.urlCredentialStorage = nil
-    delegate = SessionDelegate(logger: logger)
+    delegate = SessionDelegate(logger: logger, deadlineTimer: deadlineTimer)
     session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
   }
 
@@ -136,11 +144,13 @@ final class HTTPTransport: Transport {
     }
 
     private let logger: SafeLogger
+    private let deadlineTimer: DeadlineTimer
     private let exchanges = Locked<[Int: Exchange]>([:])
     private let reportedATS = Locked(false)
 
-    init(logger: SafeLogger) {
+    init(logger: SafeLogger, deadlineTimer: @escaping DeadlineTimer) {
       self.logger = logger
+      self.deadlineTimer = deadlineTimer
     }
 
     // URLSession's own timeout measures idleness, which a response that keeps trickling in never reaches.
@@ -154,9 +164,7 @@ final class HTTPTransport: Transport {
       exchanges.withLock {
         $0[id] = Exchange(task: task, timeoutMillis: timeoutMillis, deadline: deadline, completion: completion)
       }
-      DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(timeoutMillis)) {
-        deadline.run()
-      }
+      deadlineTimer(timeoutMillis) { deadline.run() }
       task.resume()
     }
 

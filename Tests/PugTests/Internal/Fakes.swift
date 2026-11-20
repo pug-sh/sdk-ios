@@ -9,6 +9,17 @@ extension Array {
   }
 }
 
+/// The first answer of `value` that is not nil, asked every 10 ms for up to ten seconds.
+func poll<Value>(_ value: () -> Value?, sourceLocation: SourceLocation = #_sourceLocation) async throws -> Value {
+  for _ in 0..<1_000 {
+    if let value = value() {
+      return value
+    }
+    try await Task.sleep(nanoseconds: 10_000_000)
+  }
+  return try #require(value(), "nothing within ten seconds", sourceLocation: sourceLocation)
+}
+
 /// What the consent getters answered at one moment.
 struct ConsentAnswer: Equatable, Sendable {
   let consent: Pug.TrackingConsent?

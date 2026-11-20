@@ -125,16 +125,6 @@ final class EndToEndTests {
     _ = try await poll { storage.string(forKey: StorageKeys(projectId: Self.project).externalId) }
   }
 
-  private func poll<Value>(_ value: () -> Value?) async throws -> Value {
-    for _ in 0..<1_000 {
-      if let value = value() {
-        return value
-      }
-      try await Task.sleep(nanoseconds: 10_000_000)
-    }
-    return try #require(value(), "nothing within ten seconds")
-  }
-
   private func destroy(_ client: Client) async {
     client.destroy()
     await withCheckedContinuation { continuation in
