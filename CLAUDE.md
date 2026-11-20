@@ -37,8 +37,9 @@ container (`Tools/linux.Dockerfile`, the Swift 6.2 image plus make): `make docke
 `make docker-fmt`, `make docker-ci`. The UIKit code compiles there too, in xtool's container
 (`Tools/xtool.Dockerfile`, Swift 6.4): `make xtool-sdk XIP=/path/to/Xcode.xip` installs the Darwin
 Swift SDK into `~/.swiftpm` once, from an Xcode.xip downloaded with an Apple ID (xtool 1.24's docs
-name 27.1; 27.2 works too); then `make xtool-build-ios` builds the SDK for an iOS device and the
-tests for the simulator, which it cannot run, and typechecks the sample app's sources.
+name 27.1; 27.2 works too); then `make xtool-build-ios` builds the SDK for an iOS device and for Mac
+Catalyst, builds the tests for the simulator, which it cannot run, and typechecks the sample app's
+sources.
 
 ## Commands
 
@@ -50,7 +51,7 @@ make api-dump    # rewrite api/Pug.api after a change to the public API, to revi
 make protos      # regenerate from proto/: the reference messages, Tests/PugTests/Resources/events.binpb
                  # and the typed track API (make typed-track)
 make ci          # protos + check-codegen + check: what the Linux CI job runs
-make build-ios   # macOS: the SDK for an iOS device, warnings as errors
+make build-ios   # macOS: the SDK for an iOS device and for Mac Catalyst, warnings as errors
 make check-ios   # macOS: build and tests on the Mac, build-ios, the sample app for the simulator, the
                  # tests on an iOS simulator, and under Thread Sanitizer
 ```
