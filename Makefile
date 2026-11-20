@@ -149,11 +149,13 @@ check: verify-version lint build api-check test
 
 ci: protos check-codegen check
 
-# macOS only, from here to the Docker targets: the SDK for an iOS device with warnings as errors, the
-# sample app, the tests on the first iPhone simulator available, and under Thread Sanitizer.
+# macOS only, from here to the Docker targets: the SDK for an iOS device and for Mac Catalyst with warnings as
+# errors, the sample app, the tests on the first iPhone simulator available, and under Thread Sanitizer.
 SAMPLE := Examples/PugSample
 build-ios:
 	xcodebuild build -quiet -scheme Pug -destination 'generic/platform=iOS' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+	xcodebuild build -quiet -scheme Pug -destination 'generic/platform=macOS,variant=Mac Catalyst' \
+	  SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
 
 # The sample app for the simulator, which needs no signing. The project turns SAMPLE_WARNINGS_AS_ERRORS into
 # warnings as errors for the sample's own code: Xcode builds the Pug package with its warnings suppressed, and
@@ -187,7 +189,7 @@ docker-image:
 docker-%: docker-image
 	docker run --rm --user "$$(id -u):$$(id -g)" --env HOME=/tmp --volume "$(CURDIR):/src" --workdir /src $(DOCKER_IMAGE) make $*
 
-# The SDK for an iOS device, and its tests for the simulator, without a Mac, in xtool's container
+# The SDK for an iOS device and for Mac Catalyst, and its tests for the simulator, without a Mac, in xtool's container
 # (Tools/xtool.Dockerfile). Install the Darwin Swift SDK once, from an Xcode.xip downloaded with an Apple ID,
 # with `make xtool-sdk XIP=/path/to/Xcode.xip`: it lands in ~/.swiftpm, where SwiftPM looks for it. Builds go
 # to .build/xtool, apart from the Linux ones, since the toolchain is newer than CI's.
@@ -214,6 +216,7 @@ xtool-sdk: xtool-image
 xtool-build-ios: xtool-image
 	mkdir -p "$(HOME)/.swiftpm"
 	$(XTOOL_BUILD) --triple arm64-apple-ios --target Pug
+	$(XTOOL_BUILD) --triple arm64-apple-ios-macabi --target Pug
 	$(XTOOL_BUILD) --triple arm64-apple-ios-simulator --build-tests
 	$(XTOOL_RUN) $(XTOOL_IMAGE) swiftc -typecheck -parse-as-library -swift-version 6 -warnings-as-errors \
 	  -target arm64-apple-ios15.0 -sdk $(XTOOL_SDK)/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk \
