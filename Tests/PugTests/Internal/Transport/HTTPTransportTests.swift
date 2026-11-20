@@ -182,10 +182,9 @@ final class HTTPTransportTests {
   func silentServer() async throws {
     server.enqueue(.silence)
 
-    let error = try await failure(transport(timeoutMillis: 300))
+    let error = try await failureAtDeadline(timeoutMillis: 300)
 
-    // Only the transport's own deadline writes this message, so it shows the request ended at the deadline rather
-    // than at URLSession's 60 s idle timeout. A bound on the elapsed time fails on a loaded iOS simulator.
+    // Only the transport's own deadline writes this message.
     #expect(error.code == .deadlineExceeded)
     #expect(error.message == "request timed out after 300 ms")
     #expect(!error.isPermanent)
@@ -195,9 +194,10 @@ final class HTTPTransportTests {
   func stalledResponse() async throws {
     server.enqueue(.stall(status: 200, headers: ["Content-Type": "application/proto"], body: [0x08]))
 
-    let error = try await failure(transport(timeoutMillis: 300))
+    let error = try await failureAtDeadline(timeoutMillis: 300)
 
     #expect(error.code == .deadlineExceeded)
+    #expect(error.message == "request timed out after 300 ms")
   }
 
   @Test("network failures are transient, and keep the system error")
@@ -255,7 +255,10 @@ final class HTTPTransportTests {
       HTTPURLResponse(url: server.endpoint, statusCode: 307, httpVersion: "HTTP/1.1", headerFields: nil)
     )
     let elsewhere = URLRequest(url: try #require(URL(string: "https://elsewhere.example/steal")))
-    let delegate: any URLSessionTaskDelegate = HTTPTransport.SessionDelegate(logger: logger.safe())
+    let delegate: any URLSessionTaskDelegate = HTTPTransport.SessionDelegate(
+      logger: logger.safe(),
+      deadlineTimer: HTTPTransport.dispatchDeadlineTimer
+    )
 
     // Called through the protocol, so this is the method URLSession calls.
     let next = await withCheckedContinuation { continuation in
@@ -273,14 +276,19 @@ final class HTTPTransportTests {
     #expect(next == nil)
   }
 
-  private func transport(endpoint: URL? = nil, timeoutMillis: Int = 5_000) -> HTTPTransport {
+  private func transport(
+    endpoint: URL? = nil,
+    timeoutMillis: Int = 5_000,
+    deadlineTimer: @escaping HTTPTransport.DeadlineTimer = HTTPTransport.dispatchDeadlineTimer
+  ) -> HTTPTransport {
     HTTPTransport(
       endpoint: endpoint ?? server.endpoint,
       apiKey: "pub_test",
       logger: logger.safe(),
       batchTimeoutMillis: timeoutMillis,
       identifyTimeoutMillis: timeoutMillis,
-      configuration: StubServer.configuration()
+      configuration: StubServer.configuration(),
+      deadlineTimer: deadlineTimer
     )
   }
 
@@ -294,6 +302,29 @@ final class HTTPTransportTests {
 
   private func failure(_ transport: HTTPTransport? = nil) async throws -> TransportError {
     guard case .failure(let error) = await send(transport: transport) else {
+      throw ExpectedFailure()
+    }
+    return error
+  }
+
+  // Fires the deadline once the server holds the request, rather than waiting for a real timer: one at utility QoS
+  // has fired after URLSession's own 60 s idle timeout on a loaded CI simulator.
+  private func failureAtDeadline(timeoutMillis: Int) async throws -> TransportError {
+    let deadlines = Locked<[(milliseconds: Int, expire: @Sendable () -> Void)]>([])
+    let result = Locked<BatchResult?>(nil)
+    let transport = self.transport(timeoutMillis: timeoutMillis) { milliseconds, expire in
+      deadlines.withLock { $0.append((milliseconds, expire)) }
+    }
+
+    transport.sendBatch([event("first")]) { outcome in result.withLock { $0 = outcome } }
+    _ = try await poll { server.requests.first }
+    let armed = deadlines.withLock { $0 }
+    #expect(armed.map(\.milliseconds) == [timeoutMillis])
+    for deadline in armed {
+      deadline.expire()
+    }
+
+    guard case .failure(let error) = try await poll({ result.withLock { $0 } }) else {
       throw ExpectedFailure()
     }
     return error

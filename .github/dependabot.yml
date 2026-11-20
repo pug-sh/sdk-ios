@@ -19,6 +19,7 @@ updates:
       - dependency-name: "github.com/apple/swift-protobuf"
         versions: [">= 1.38.0"]
 
+  # The workflows pin actions by commit; without this they would never move.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
