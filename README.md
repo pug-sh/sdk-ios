@@ -1,7 +1,8 @@
 # Pug iOS SDK
 
-Native Swift SDK for [Pug](https://pug.sh) analytics on iOS: event tracking, identity, sessions,
-consent, and batched delivery that survives restarts and bad networks.
+Open-source product analytics SDK for iOS, from [Pug](https://pug.sh): a native Swift SDK with
+event tracking, identity, sessions, consent, and batched delivery that survives restarts and bad
+networks.
 
 - iOS and iPadOS 15 or newer, Mac Catalyst and iPad apps on a Mac included. Xcode 16 or newer;
   apps in the Swift 5 language mode can use it too, and Objective-C code through a Swift wrapper of
