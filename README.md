@@ -17,7 +17,7 @@ the `Pug` library to your app's target. In a `Package.swift`:
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/pug-sh/sdk-ios.git", from: "0.1.0"),
+  .package(url: "https://github.com/pug-sh/sdk-ios.git", from: "0.1.1"),
 ],
 targets: [
   .target(name: "YourApp", dependencies: [.product(name: "Pug", package: "sdk-ios")]),
