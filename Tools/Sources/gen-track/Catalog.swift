@@ -14,7 +14,7 @@ enum FieldType {
   case int
   case double
   case bool
-  // Taken as a TimeInterval; the SDK sends options.proto's text form, such as "1.5s".
+  // Taken as a TimeInterval in seconds and sent as a duration_value.
   case duration
 
   var swiftType: String {

@@ -114,12 +114,17 @@ warning. Property values map as follows:
 | `Double`, `Float`, `CGFloat`, `Decimal` | decimal; NaN and infinities are dropped |
 | `NSNumber` | by what it holds: boolean, integer or decimal |
 | `Date` | timestamp |
+| `Duration` (iOS 16 and later) | duration, to the nanosecond; one beyond 10,000 years is dropped |
 | arrays, dictionaries and sets | JSON text |
 | `nil`, `Optional.none`, `NSNull` | left out |
 | anything else, such as `UUID`, `URL` or another enum | its `String(describing:)`, cut to 1024 UTF-8 bytes |
 
 A key starting with `$` is reserved for auto-properties and dropped with a warning. Properties are
 read during the call, so the dictionary can be changed or reused as soon as `track` returns.
+
+The server stores a duration as a number of seconds, so durations can be summed and averaged. A
+self-hosted server and events worker must be at v0.0.65 or later to accept one: an older server
+drops the event (before v0.0.55, its whole batch), and an older events worker loses the whole batch.
 
 `Pug.TrackOptions(immediate: true)` sends the event on its own right away instead of with the next
 batch; if that send fails it joins the queue for a retry. `Pug.TrackOptions(timestamp:)` sets when
@@ -146,10 +151,10 @@ Pug.track.addToCart(
 
 - `extras` carries further properties. An extra named like an argument is dropped with a warning
   when that argument is set.
-- Durations are `TimeInterval` seconds, sent as text and rounded to the millisecond:
-  `position: 1.5` sends `position: "1.5s"`.
-- Values are sent as given: the schemas name and type the properties, but ranges and patterns are
-  not enforced on the device.
+- Durations are `TimeInterval` seconds, sent as durations rounded to the nanosecond: `position: 1.5`
+  is a second and a half. They need server v0.0.65 or later, like any duration.
+- Values are sent as given: the schemas name and type the properties, but neither the SDK nor the
+  server enforces their ranges and patterns.
 - The events the SDK tracks itself have no method: `app_open`, `app_close`, `app_install`,
   `app_update` and `screen_view`. For a screen that is not a view controller, call `Pug.screen`.
   With the automatic events turned off, `Pug.track(Pug.Events.appOpen)` and the like still work.
@@ -157,6 +162,7 @@ Pug.track.addToCart(
 The kinds are constants in `Pug.Events` (`Pug.Events.addToCart` is `"add_to_cart"`). Tracking a
 well-known kind with `Pug.track(_:properties:)` works too, and a whole number given for a decimal
 property is sent as a decimal (`"price": 10` arrives as `10.0`), so both paths fill the same column.
+For a duration property, pass a `Duration` there, on iOS 16 and later.
 
 ## Automatic events
 
@@ -220,8 +226,9 @@ Pug.identify("user-42", traits: ["email": "ada@example.com", "plan": "pro"])
 ```
 
 `identify` attaches your own user id, and optional traits, to the profile. The first call links the
-events tracked anonymously so far to that user. Traits may nest dictionaries and arrays. A blank id
-or one starting with `cookieless-` (reserved by the server) is rejected with an error in the log.
+events tracked anonymously so far to that user. Traits may nest dictionaries and arrays, and a
+`Duration` trait is sent as a number of seconds. A blank id or one starting with `cookieless-` or
+`crawler-` (reserved by the server) is rejected with an error in the log.
 `identify` is never retried; a failure is logged.
 
 ```swift
@@ -300,7 +307,9 @@ foreground or a screen appears, the rest once per launch.
 - Events are queued and sent in batches, one request at a time. A request that fails for a reason
   that may pass (no network, a timeout, a server error, a captive portal) is retried with
   exponential backoff from `batchMaxWait` (at least a second) up to five minutes. A request the
-  server rejects for good is dropped and logged as an error.
+  server rejects for good is dropped and logged as an error. A batch the server accepts can still
+  lose single events, such as one that breaks a validation rule: a warning gives the server's
+  reasons and names the first three invalid events with the rules they broke.
 - Undelivered events, identity and consent are kept in files under the app's Application Support
   directory, in `<bundle id>/pug`, which is excluded from backups: they survive restarts but are not
   restored onto another device. Deleting the app deletes them, so a reinstall is a new install with

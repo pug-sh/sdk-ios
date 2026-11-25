@@ -57,16 +57,35 @@ struct TrackNamespaceTests {
     #expect(logger.entries.isEmpty)
   }
 
-  @Test("a duration is sent in seconds, rounded to the millisecond")
+  @Test("a duration is sent as a Duration of its seconds, rounded to the nanosecond")
   func durations() {
     track.videoSeeked(videoId: "v1", fromPosition: 1.5, toPosition: 61)
-    track.audioPause(audioId: "a1", position: 1.2346)
+    track.audioPause(audioId: "a1", position: 1.234_567_890_4)
 
     #expect(
       facade.calls.map(\.properties) == [
-        ["videoId": .string("v1"), "fromPosition": .string("1.5s"), "toPosition": .string("61s")],
-        ["audioId": .string("a1"), "position": .string("1.235s")],
+        [
+          "videoId": .string("v1"),
+          "fromPosition": .duration(seconds: 1, nanos: 500_000_000),
+          "toPosition": .duration(seconds: 61, nanos: 0),
+        ],
+        ["audioId": .string("a1"), "position": .duration(seconds: 1, nanos: 234_567_890)],
       ]
+    )
+    #expect(logger.entries.isEmpty)
+  }
+
+  @Test("a duration argument that is set wins over an extra of its name")
+  func durationWinsOverExtra() {
+    track.videoPlay(videoId: "v1", position: 1.5, extras: ["position": 99])
+
+    #expect(
+      facade.calls.map(\.properties) == [
+        ["videoId": .string("v1"), "position": .duration(seconds: 1, nanos: 500_000_000)]
+      ]
+    )
+    #expect(
+      logger.warnings == ["Extra \"position\" of Pug.track.videoPlay() was dropped: the event's own position is set"]
     )
   }
 
@@ -79,7 +98,7 @@ struct TrackNamespaceTests {
     #expect(
       logger.warnings == [
         "Property \"position\" on event \"video_play\" was dropped: nan is not a finite number",
-        "Property \"position\" on event \"video_pause\" was dropped: it is out of range",
+        "Property \"position\" on event \"video_pause\" was dropped: the duration is beyond ±10,000 years",
       ]
     )
   }

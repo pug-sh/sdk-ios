@@ -236,18 +236,24 @@ struct EventQueueTests {
   @Test("stored events with a reserved distinct id are dropped")
   func reservedDistinctIds() throws {
     let healthy = event(0)
-    var poisoned = event(1)
-    poisoned.distinctId = "cookieless-abc"
-    memory.setString("[\(EventJSON.encode(poisoned)),\(EventJSON.encode(healthy))]", forKey: Self.key)
+    var cookieless = event(1)
+    cookieless.distinctId = "cookieless-abc"
+    var crawler = event(2)
+    crawler.distinctId = "crawler-abc"
+    memory.setString(
+      "[\(EventJSON.encode(cookieless)),\(EventJSON.encode(healthy)),\(EventJSON.encode(crawler))]",
+      forKey: Self.key
+    )
 
     let queue = makeQueue()
 
     #expect(queue.totalCount == 1)
     #expect(try stored() == [healthy])
-    #expect(logger.warnings.count == 1)
     #expect(
-      logger.warnings.first?.hasPrefix("1 stored events were dropped: their distinct id uses the reserved")
-        == true
+      logger.warnings == [
+        #"2 stored events were dropped: their distinct id uses a prefix the server reserves, "cookieless-" or "#
+          + #""crawler-""#
+      ]
     )
   }
 

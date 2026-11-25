@@ -77,6 +77,19 @@ struct TraitsMapperTests {
     )
   }
 
+  @available(macOS 13, iOS 16, tvOS 16, watchOS 9, *)
+  @Test("durations become numbers of seconds")
+  func durations() {
+    let mapped = mapper.map([
+      "watched": Duration.seconds(90.5),
+      "nested": [Duration.milliseconds(-250)],
+      "forever": Duration.seconds(Int64.max) * 10,
+    ])
+
+    #expect(mapped == ["watched": .number(90.5), "nested": .array([.number(-0.25)])])
+    #expect(logger.warnings == ["Trait \"forever\" was dropped: the duration is beyond ±10,000 years"])
+  }
+
   @Test("the first and last representable days use the proleptic Gregorian calendar")
   func calendarBounds() {
     let first = Double(Limits.timestampMillis.lowerBound) / 1_000

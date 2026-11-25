@@ -161,7 +161,7 @@ final class EventQueue {
         unreadable += 1
         continue
       }
-      if event.distinctId.hasUTF8Prefix(Identity.reservedIdPrefix) {
+      if Identity.reservedPrefix(of: event.distinctId) != nil {
         reserved += 1
       } else {
         pending.append(Entry(event))
@@ -174,8 +174,8 @@ final class EventQueue {
     }
     if reserved > 0 {
       logger.warning(
-        "\(reserved) stored events were dropped: their distinct id uses the reserved "
-          + "\"\(Identity.reservedIdPrefix)\" prefix, which the server rejects")
+        "\(reserved) stored events were dropped: their distinct id uses a prefix the server reserves, "
+          + Identity.reservedIdPrefixes.map { "\"\($0)\"" }.joined(separator: " or "))
     }
     if excess > 0 {
       logger.warning("\(excess) of the oldest stored events were dropped to fit maxQueueSize \(maxQueueSize)")

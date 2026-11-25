@@ -1,8 +1,8 @@
 import Foundation
 
-/// Maps host values onto `PropertyValue`, dropping what the server would reject: every property is
-/// validated with its batch, so one bad value would fail the events sent alongside it. Keys are read in
-/// order, so warnings come out the same way every run.
+/// Maps host values onto `PropertyValue`, dropping what the server would reject: one bad value would cost its whole
+/// event, and on a server before v0.0.55 the events sent alongside it too. Keys are read in order, so warnings come
+/// out the same way every run.
 struct PropertyMapper: Sendable {
   let logger: SafeLogger
 
@@ -22,21 +22,22 @@ struct PropertyMapper: Sendable {
     assert(values.count == event.fields.count, "\(event.label) passed \(values.count) values")
     let caller = "Pug.\(event.label)()"
     var typed: [String: Any] = [:]
+    var durations: [String: PropertyValue] = [:]
     for (field, value) in zip(event.fields, values) {
       guard let value else { continue }
       guard field.type == .duration, let seconds = value as? TimeInterval else {
         typed[field.name] = value
         continue
       }
-      if let milliseconds = durationMilliseconds(seconds) {
-        typed[field.name] = durationText(milliseconds: milliseconds)
-      } else {
-        let reason = seconds.isFinite ? "it is out of range" : "\(seconds) is not a finite number"
-        logger.warning("Property \"\(field.name)\" on event \"\(event.kind)\" was dropped: \(reason)")
+      do {
+        durations[field.name] = try duration(seconds: seconds)
+      } catch {
+        logger.warning("Property \"\(field.name)\" on event \"\(event.kind)\" was dropped: \(error.reason)")
       }
     }
     var custom = extras.map { mapCustom(kind: event.kind, $0) } ?? [:]
-    for (name, value) in mapCustom(kind: event.kind, typed).sortedByUTF16Key() {
+    let own = mapCustom(kind: event.kind, typed).merging(durations) { $1 }
+    for (name, value) in own.sortedByUTF16Key() {
       if custom.updateValue(value, forKey: name) != nil {
         logger.warning("Extra \"\(name)\" of \(caller) was dropped: the event's own \(name) is set")
       }
@@ -89,10 +90,21 @@ struct PropertyMapper: Sendable {
         throw .outOfRangeTime
       }
       return .timestamp(epochMillis: millis)
+    case .duration(let seconds, let attoseconds):
+      guard let duration = PropertyValue.duration(seconds: seconds, attoseconds: attoseconds) else {
+        throw .outOfRangeDuration
+      }
+      return duration
     case .array, .set, .object:
       var json = HostJSON()
       return .string(try json.convert(value).text)
     }
+  }
+
+  private func duration(seconds: TimeInterval) throws(UnsupportedValue) -> PropertyValue {
+    guard seconds.isFinite else { throw UnsupportedValue("\(seconds) is not a finite number") }
+    guard let duration = PropertyValue.duration(seconds: seconds) else { throw .outOfRangeDuration }
+    return duration
   }
 
   // A double-typed property of a well-known event gets one column type, even from `price: 10`.

@@ -1,5 +1,5 @@
 // Field numbers mirror proto/sdk/events/v1/events.proto, proto/sdk/profiles/v1/profiles.proto,
-// proto/common/v1/property_value.proto and google/protobuf/{timestamp,struct}.proto. Map entries are
+// proto/common/v1/property_value.proto and google/protobuf/{timestamp,duration,struct}.proto. Map entries are
 // written in UTF-16 key order, which is what protobuf-java's deterministic serialization produces.
 enum Wire {
   static func encodeBatchCreateRequest(_ events: [Event]) -> [UInt8] {
@@ -31,6 +31,7 @@ enum Wire {
     var reader = ProtoReader(bytes)
     var accepted: Int64 = 0
     var droppedByReason: [String: Int64] = [:]
+    var invalidEvents: [InvalidEvent] = []
     while !reader.isAtEnd {
       let tag = try reader.readTag()
       switch tag {
@@ -52,11 +53,30 @@ enum Wire {
           }
         }
         droppedByReason[reason] = count
+      case key(4, .len):
+        invalidEvents.append(try invalidEvent(reader.readMessage()))
       default:
         try reader.skip(wireType: tag & 7)
       }
     }
-    return BatchCreateResponse(accepted: accepted, droppedByReason: droppedByReason)
+    return BatchCreateResponse(accepted: accepted, droppedByReason: droppedByReason, invalidEvents: invalidEvents)
+  }
+
+  private static func invalidEvent(_ message: ProtoReader) throws -> InvalidEvent {
+    var message = message
+    var invalid = InvalidEvent(index: 0, violations: [])
+    while !message.isAtEnd {
+      let tag = try message.readTag()
+      switch tag {
+      case key(1, .varint):
+        invalid.index = uint32(try message.readVarint())
+      case key(2, .len):
+        invalid.violations.append(try message.readString())
+      default:
+        try message.skip(wireType: tag & 7)
+      }
+    }
+    return invalid
   }
 
   // Edition 2023 gives singular fields explicit presence, so an empty id would be sent as a set
@@ -74,7 +94,7 @@ enum Wire {
   }
 
   // A selected oneof member is written even when it holds the default value: without it the
-  // PropertyValue is empty, which the server's oneof.required rule rejects for the whole batch.
+  // PropertyValue is empty, which breaks the server's oneof.required rule and costs the event.
   private static func propertyValue(_ value: PropertyValue) -> ProtoWriter {
     var message = ProtoWriter(capacity: 16)
     switch value {
@@ -88,12 +108,19 @@ enum Wire {
       message.writeBool(field: 4, bool)
     case .timestamp(let epochMillis):
       message.writeMessage(field: 5, timestamp(epochMillis))
+    case .duration(let seconds, let nanos):
+      message.writeMessage(field: 6, timeMessage(seconds: seconds, nanos: nanos))
     }
     return message
   }
 
   private static func timestamp(_ epochMillis: Int64) -> ProtoWriter {
     let (seconds, nanos) = secondsAndNanos(epochMillis)
+    return timeMessage(seconds: seconds, nanos: nanos)
+  }
+
+  // A Timestamp or a Duration, which share their fields.
+  private static func timeMessage(seconds: Int64, nanos: Int32) -> ProtoWriter {
     var message = ProtoWriter(capacity: 16)
     if seconds != 0 {
       message.writeInt64(field: 1, seconds)
@@ -174,11 +201,17 @@ enum Wire {
       return tagSize(field: 4) + 1
     case .timestamp(let epochMillis):
       return lengthDelimitedSize(field: 5, timestampSize(epochMillis))
+    case .duration(let seconds, let nanos):
+      return lengthDelimitedSize(field: 6, timeMessageSize(seconds: seconds, nanos: nanos))
     }
   }
 
   private static func timestampSize(_ epochMillis: Int64) -> Int {
     let (seconds, nanos) = secondsAndNanos(epochMillis)
+    return timeMessageSize(seconds: seconds, nanos: nanos)
+  }
+
+  private static func timeMessageSize(seconds: Int64, nanos: Int32) -> Int {
     var size = 0
     if seconds != 0 {
       size += tagSize(field: 1) + varintSize(UInt64(bitPattern: seconds))

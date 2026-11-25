@@ -24,7 +24,7 @@ struct EventFactory: Sendable {
   let properties: PropertyMapper
   let ids: any IdGenerator
 
-  /// Logs and returns false for a kind the server would reject along with the rest of its batch.
+  /// Logs and returns false for a kind the server refuses.
   func acceptsKind(_ kind: String) -> Bool {
     if kind.isValidKind {
       return true

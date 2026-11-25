@@ -66,13 +66,13 @@ struct WireTests {
     var event = minimalEvent()
     event.customProperties = [
       "zero": .int(0), "zeroDouble": .double(0), "false": .bool(false), "empty": .string(""),
-      "epoch": .timestamp(epochMillis: 0),
+      "epoch": .timestamp(epochMillis: 0), "instant": .duration(seconds: 0, nanos: 0),
     ]
 
     let parsed = try Sdk_Events_V1_BatchCreateRequest(serializedBytes: Wire.encodeBatchCreateRequest([event]))
 
     let properties = try #require(parsed.events.first).customProperties
-    #expect(properties.count == 5)
+    #expect(properties.count == 6)
     for (key, value) in properties {
       #expect(value.value != nil, "PropertyValue for \(key) has no oneof member set")
     }
@@ -115,6 +115,10 @@ struct WireTests {
       "epoch": .timestamp(epochMillis: 0),
       "negative": .int(-1),
       "extremes": .timestamp(epochMillis: .min),
+      "rewind": .duration(seconds: -1, nanos: -1),
+      "fraction": .duration(seconds: 0, nanos: 500_000_000),
+      "instant": .duration(seconds: 0, nanos: 0),
+      "longest": .duration(seconds: -315_576_000_000, nanos: -999_999_999),
     ]
     var fixtures = Fixtures(seed: 0x512E)
     let events =
@@ -169,8 +173,9 @@ struct WireTests {
   func decodesResponse() throws {
     let reference = ReferenceMessages.batchResponse(
       accepted: 7,
-      dropped: 3,
-      droppedByReason: ["salt_unavailable": 2, "day_out_of_range": 1]
+      dropped: 4,
+      droppedByReason: ["salt_unavailable": 2, "day_out_of_range": 1, "invalid_event": 1],
+      invalidEvents: [(index: 9, violations: ["event.kind: value is required", "and 3 more"])]
     )
     // Field 99 as a varint, 100 length-delimited, and 101 as fixed32 then fixed64.
     let unknown: [UInt8] =
@@ -183,7 +188,31 @@ struct WireTests {
 
     #expect(
       decoded
-        == BatchCreateResponse(accepted: 7, droppedByReason: ["salt_unavailable": 2, "day_out_of_range": 1]))
+        == BatchCreateResponse(
+          accepted: 7,
+          droppedByReason: ["salt_unavailable": 2, "day_out_of_range": 1, "invalid_event": 1],
+          invalidEvents: [InvalidEvent(index: 9, violations: ["event.kind: value is required", "and 3 more"])]
+        )
+    )
+  }
+
+  @Test("invalid events decode in order, with unknown fields inside them skipped")
+  func invalidEvents() throws {
+    // Index 2 then an unknown field 3, and index 0 left out, as a writer may leave out a zero.
+    let first: [UInt8] = [0x08, 0x02, 0x12, 0x01, UInt8(ascii: "a"), 0x18, 0x07, 0x12, 0x01, UInt8(ascii: "b")]
+    let second: [UInt8] = [0x12, 0x01, UInt8(ascii: "c")]
+    let bytes = [0x08, 0x01, 0x22, UInt8(first.count)] + first + [0x22, UInt8(second.count)] + second + [0x22, 0x00]
+
+    let decoded = try Wire.decodeBatchCreateResponse(bytes)
+
+    let expected = [
+      InvalidEvent(index: 2, violations: ["a", "b"]), InvalidEvent(index: 0, violations: ["c"]),
+      InvalidEvent(index: 0, violations: []),
+    ]
+    #expect(decoded == BatchCreateResponse(accepted: 1, droppedByReason: [:], invalidEvents: expected))
+    let reference = try Sdk_Events_V1_BatchCreateResponse(serializedBytes: bytes)
+    #expect(reference.invalidEvents.map { Int64($0.index) } == expected.map(\.index))
+    #expect(reference.invalidEvents.map(\.violations) == expected.map(\.violations))
   }
 
   @Test("unknown fields inside a reason entry are skipped")
@@ -230,16 +259,21 @@ struct WireTests {
       for _ in 0..<fixtures.count(0...4) {
         reasons[fixtures.string(.unicode)] = fixtures.uint32()
       }
+      let invalid = (0..<fixtures.count(0...3)).map { _ in
+        (index: fixtures.uint32(), violations: (0..<fixtures.count(0...3)).map { _ in fixtures.string(.unicode) })
+      }
       let response = ReferenceMessages.batchResponse(
         accepted: fixtures.uint32(),
         dropped: fixtures.uint32(),
-        droppedByReason: reasons
+        droppedByReason: reasons,
+        invalidEvents: invalid
       )
 
       let decoded = try Wire.decodeBatchCreateResponse(response.serializedBytes())
 
       #expect(decoded.accepted == Int64(response.accepted))
       #expect(decoded.droppedByReason == reasons.mapValues { Int64($0) })
+      #expect(decoded.invalidEvents == invalid.map { InvalidEvent(index: Int64($0.index), violations: $0.violations) })
     }
   }
 
@@ -255,7 +289,11 @@ struct WireTests {
     )
     .deterministicBytes()
 
-    for bytes in [Array(valid.dropLast()), [0x08], [0x1A, 0x7F], [0x0B], [0x1A, 0x02, 0x0A, 0x05]] {
+    let malformed: [[UInt8]] = [
+      Array(valid.dropLast()), [0x08], [0x1A, 0x7F], [0x0B], [0x1A, 0x02, 0x0A, 0x05], [0x22, 0x02, 0x12, 0x05],
+      [0x22, 0x01, 0x08],
+    ]
+    for bytes in malformed {
       #expect(throws: ProtoDecodeError.self, "\(bytes)") { try Wire.decodeBatchCreateResponse(bytes) }
     }
   }
@@ -266,8 +304,9 @@ struct WireTests {
   func hostileResponses() throws {
     let valid = try ReferenceMessages.batchResponse(
       accepted: 7,
-      dropped: 3,
-      droppedByReason: ["salt_unavailable": 2, "day_out_of_range": 1]
+      dropped: 4,
+      droppedByReason: ["salt_unavailable": 2, "day_out_of_range": 1, "invalid_event": 1],
+      invalidEvents: [(index: 3, violations: ["event.kind: value is required"])]
     ).deterministicBytes()
     var inputs = (0..<valid.count).map { Array(valid.prefix($0)) }
     for index in valid.indices {
@@ -314,6 +353,9 @@ struct WireTests {
         "addedAt": .timestamp(epochMillis: 1_760_000_000_999),
         "before1970": .timestamp(epochMillis: -1),
         "wholeSecond": .timestamp(epochMillis: 1_000),
+        "position": .duration(seconds: 12, nanos: 500_000_000),
+        "rewind": .duration(seconds: -1, nanos: -500_000_000),
+        "longest": .duration(seconds: 315_576_000_000, nanos: 999_999_999),
         "\u{FC}-key": .string("unicode key"),
         "Z-upper": .string("sorts before lowercase"),
       ]
@@ -435,7 +477,7 @@ private struct Fixtures {
   }
 
   private mutating func value() -> PropertyValue {
-    switch count(0...4) {
+    switch count(0...5) {
     case 0:
       return .string(string(.unicode))
     case 1:
@@ -446,9 +488,21 @@ private struct Fixtures {
         double.isFinite ? double : pick([0, -0.0, .leastNonzeroMagnitude, -.greatestFiniteMagnitude]))
     case 3:
       return .bool(Bool.random(using: &random))
-    default:
+    case 4:
       return .timestamp(epochMillis: millis())
+    default:
+      return duration()
     }
+  }
+
+  private mutating func duration() -> PropertyValue {
+    let seconds = Int64.random(in: Limits.durationSeconds, using: &random)
+    let nanos = Int32.random(in: 0...999_999_999, using: &random)
+    let sign: Int64 = Bool.random(using: &random) ? -1 : 1
+    let picked = Bool.random(using: &random) ? pick([0, 1, Limits.durationSeconds.upperBound]) * sign : seconds
+    // Nanos take the sign of the seconds, or either sign under a second.
+    let signedNanos = picked < 0 || (picked == 0 && sign < 0) ? -nanos : nanos
+    return .duration(seconds: picked, nanos: signedNanos)
   }
 
   private mutating func millis() -> Int64 {

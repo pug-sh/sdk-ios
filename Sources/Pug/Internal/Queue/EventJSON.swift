@@ -1,5 +1,5 @@
 /// The persisted form of a queued event, in the family's domain shape: values are tagged `{"stringValue": ...}`,
-/// `{"intValue": ...}` and so on, and times are epoch milliseconds.
+/// `{"intValue": ...}` and so on, times are epoch milliseconds, and durations `{"seconds": ..., "nanos": ...}`.
 enum EventJSON {
   static func encode(_ event: Event) -> String {
     let json = JSONWriter(capacity: 256)
@@ -15,7 +15,7 @@ enum EventJSON {
   }
 
   /// The event in `json`, an element of what `StoredJSON.parse` read, or nil when it is incomplete or would fail
-  /// the server's validation: one such event would get its whole batch rejected.
+  /// the server's validation, which drops it.
   static func decode(_ json: Any) -> Event? {
     guard let object = json as? [String: Any],
       let eventId = object["eventId"] as? String, eventId.isUUID,
@@ -52,6 +52,11 @@ enum EventJSON {
         json.name("boolValue").value(bool)
       case .timestamp(let epochMillis):
         json.name("timestampValue").value(epochMillis)
+      case .duration(let seconds, let nanos):
+        json.name("durationValue").beginObject()
+          .name("seconds").value(seconds)
+          .name("nanos").value(Int64(nanos))
+          .endObject()
       }
       json.endObject()
     }
@@ -86,6 +91,11 @@ enum EventJSON {
     case "timestampValue":
       guard let millis = StoredJSON.int64(value), Limits.timestampMillis.contains(millis) else { return nil }
       return .timestamp(epochMillis: millis)
+    case "durationValue":
+      guard let duration = value as? [String: Any], duration.count == 2,
+        let seconds = StoredJSON.int64(duration["seconds"]), let nanos = StoredJSON.int64(duration["nanos"])
+      else { return nil }
+      return PropertyValue.normalizedDuration(seconds: seconds, nanos: nanos)
     default:
       return nil
     }

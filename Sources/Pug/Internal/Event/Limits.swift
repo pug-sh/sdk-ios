@@ -12,4 +12,7 @@ enum Limits {
 
   // Event.occur_time must fall in 1970 to 9999.
   static let occurTimeMillis: ClosedRange<Int64> = 0...253_402_300_799_999
+
+  // google.protobuf.Duration spans about ±10,000 years, plus up to 999,999,999 nanos of the same sign.
+  static let durationSeconds: ClosedRange<Int64> = -315_576_000_000...315_576_000_000
 }

@@ -191,7 +191,10 @@ struct ClientTests {
     let event = try transport.batches.single().single()
     #expect(event.kind == "video_play")
     #expect(
-      event.customProperties == ["videoId": .string("v1"), "position": .string("1.5s"), "quality": .string("hd")])
+      event.customProperties == [
+        "videoId": .string("v1"), "position": .duration(seconds: 1, nanos: 500_000_000), "quality": .string("hd"),
+      ]
+    )
   }
 
   @Test("nothing is tracked or identified while consent is denied")
@@ -267,6 +270,7 @@ struct ClientTests {
 
     client.identify(" ", traits: nil)
     client.identify("cookieless-abc", traits: nil)
+    client.identify("crawler-abc", traits: nil)
     scheduler.runCurrent()
 
     #expect(transport.identifies.isEmpty)
@@ -274,6 +278,7 @@ struct ClientTests {
       logger.errors == [
         "identify() was dropped: externalId is blank",
         "identify() was dropped: externalId may not start with \"cookieless-\"",
+        "identify() was dropped: externalId may not start with \"crawler-\"",
       ]
     )
   }

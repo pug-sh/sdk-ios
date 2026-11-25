@@ -117,9 +117,9 @@ final class Client: Sendable {
       logger.error("identify() was dropped: externalId is blank")
       return
     }
-    // As the distinct id it would fail every batch it is in.
-    if externalId.hasUTF8Prefix(Identity.reservedIdPrefix) {
-      logger.error("identify() was dropped: externalId may not start with \"\(Identity.reservedIdPrefix)\"")
+    // The server would refuse it, and as the distinct id it would get every event dropped.
+    if let reserved = Identity.reservedPrefix(of: externalId) {
+      logger.error("identify() was dropped: externalId may not start with \"\(reserved)\"")
       return
     }
     let mapped = traits.map(traitsMapper.map) ?? [:]
