@@ -7,8 +7,9 @@ import FoundationNetworking
 /// Connect unary calls in the binary codec, over an ephemeral `URLSession` that keeps no cookies, cache or credentials.
 /// Redirects are refused, so the API key never travels to another host.
 final class HTTPTransport: Transport {
-  // Acknowledgements and Connect errors are small: the rest of a larger body is never read.
-  static let maxResponseBytes = 64 * 1_024
+  // A BatchCreate answer names each event the server dropped as invalid, with up to 11 violations: about a megabyte for
+  // a full batch of them. The rest of a larger body is never read.
+  static let maxResponseBytes = 2 * 1_024 * 1_024
 
   private static let userAgent = "pug-ios/\(sdkVersion)"
 

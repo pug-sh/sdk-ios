@@ -22,6 +22,10 @@ struct EventJSONTests {
         "whole": .double(2),
         "false": .bool(false),
         "before1970": .timestamp(epochMillis: -1),
+        "position": .duration(seconds: 12, nanos: 500_000_000),
+        "rewind": .duration(seconds: -1, nanos: -1),
+        "instant": .duration(seconds: 0, nanos: 0),
+        "longest": .duration(seconds: -315_576_000_000, nanos: -999_999_999),
         "\u{FC}-key \"quoted\"": .int(1),
       ],
       auto: ["$platform": .string("ios")]
@@ -35,7 +39,10 @@ struct EventJSONTests {
   @Test("the stored shape is the family's domain shape, keys in UTF-16 order")
   func storedShape() {
     let event = event(
-      custom: ["n": .int(1), "b": .bool(true), "\u{1F30D}": .double(1.5), "\u{FF5E}": .string("x")],
+      custom: [
+        "n": .int(1), "b": .bool(true), "d": .duration(seconds: -1, nanos: -500_000_000), "\u{1F30D}": .double(1.5),
+        "\u{FF5E}": .string("x"),
+      ],
       auto: ["$at": .timestamp(epochMillis: 5)]
     )
 
@@ -43,6 +50,7 @@ struct EventJSONTests {
       EventJSON.encode(event)
         == #"{"eventId":"\#(Self.eventId)","kind":"add_to_cart","sessionId":"\#(Self.sessionId)","#
         + #""distinctId":"anon-1","occurTime":1760000000123,"customProperties":{"b":{"boolValue":true},"#
+        + #""d":{"durationValue":{"seconds":-1,"nanos":-500000000}},"#
         + #""n":{"intValue":1},"\#u{1F30D}":{"doubleValue":1.5},"\#u{FF5E}":{"stringValue":"x"}},"#
         + #""autoProperties":{"$at":{"timestampValue":5}}}"#
     )
@@ -81,6 +89,16 @@ struct EventJSONTests {
       custom { $0["a"] = ["intValue": 1.5] },
       custom { $0["a"] = ["boolValue": 1] },
       custom { $0["a"] = ["doubleValue": false] },
+      custom { $0["a"] = ["durationValue": 1.5] },
+      custom { $0["a"] = ["durationValue": "1.5s"] },
+      custom { $0["a"] = ["durationValue": ["seconds": 1]] },
+      custom { $0["a"] = ["durationValue": ["seconds": 1, "nanos": 0, "extra": 0]] },
+      custom { $0["a"] = ["durationValue": ["seconds": 1.5, "nanos": 0]] },
+      custom { $0["a"] = ["durationValue": ["seconds": 1, "nanos": 1_000_000_001]] },
+      custom { $0["a"] = ["durationValue": ["seconds": 315_576_000_001, "nanos": 0]] },
+      custom { $0["a"] = ["durationValue": ["seconds": -315_576_000_000, "nanos": -1_000_000_000]] },
+      custom { $0["a"] = ["durationValue": ["seconds": Int64.max, "nanos": 1_000_000_000]] },
+      custom { $0["a"] = ["durationValue": ["seconds": Int64.min, "nanos": -1_000_000_000]] },
       custom { $0["a"] = [String: Any]() },
       custom { $0["a"] = 1 },
       { $0["customProperties"] = NSNull() },

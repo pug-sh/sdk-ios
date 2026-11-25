@@ -2,9 +2,14 @@
 /// written through to storage. Ids are minted on first use rather than on load, so a client whose consent is denied
 /// never writes one.
 final class Identity {
-  /// The server mints cookieless ids with this prefix and rejects any batch whose distinct id has it.
-  static let reservedIdPrefix = "cookieless-"
+  /// The server mints the ids of cookieless and crawler events with these prefixes. It refuses them in identify and
+  /// drops every event whose distinct id has one.
+  static let reservedIdPrefixes = ["cookieless-", "crawler-"]
   static let anonymousIdPrefix = "anon-"
+
+  static func reservedPrefix(of id: String) -> String? {
+    reservedIdPrefixes.first { id.hasUTF8Prefix($0) }
+  }
 
   private struct Session {
     let id: String
@@ -137,18 +142,18 @@ final class Identity {
       anonymousId = nil
     }
     var externalId = profile?["externalId"] as? String ?? storage.string(forKey: keys.externalId)
-    // Written by an identify the server accepted before it reserved the prefix. As the distinct id it fails
-    // every batch it is in, healthy events included.
-    let reserved = externalId?.hasUTF8Prefix(Self.reservedIdPrefix) == true
-    if reserved {
+    // Written by an identify the server accepted before it reserved the prefix. As the distinct id it would get every
+    // event dropped.
+    let reserved = externalId.flatMap(Self.reservedPrefix)
+    if let reserved {
       logger.warning(
-        "The stored external id uses the reserved \"\(Self.reservedIdPrefix)\" prefix and was discarded; "
+        "The stored external id uses the reserved \"\(reserved)\" prefix and was discarded; "
           + "the user is anonymous until identify() is called again")
       externalId = nil
     }
     currentAnonymousId = anonymousId
     self.externalId = externalId == "" ? nil : externalId
-    if reserved {
+    if reserved != nil {
       storage.removeValue(forKey: keys.externalId)
       storeProfile()
     }

@@ -25,9 +25,11 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// oneof.required option below.
 ///
 /// Lists, objects, and other compound types are intentionally not included
-/// in this iteration — only the five primitive types supported by the
-/// ClickHouse Variant storage target. New variants can be added later as
-/// additive oneof entries (wire-compatible).
+/// in this iteration: only primitive types the ClickHouse Variant storage
+/// target can hold. A server older than a oneof case sees no case set and
+/// drops the event, and a server before v0.0.55 rejects the whole batch. An
+/// events worker older than the case, behind a newer server, sends the whole
+/// batch to the DLQ. So SDKs must not send a case their deployment predates.
 struct Common_V1_PropertyValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -40,8 +42,8 @@ struct Common_V1_PropertyValue: Sendable {
   /// upstream rather than embedded as a property value. Note: max_len
   /// counts codepoints, not bytes — multi-byte UTF-8 (emoji, CJK) can
   /// exceed 1 KiB on the wire at this limit. Switch to max_bytes if a
-  /// hard byte cap is required. Values exceeding the limit are rejected
-  /// at the validate interceptor with CodeInvalidArgument (not truncated).
+  /// hard byte cap is required. An event with a longer value is dropped
+  /// as invalid_event, not truncated.
   ///
   /// Empty-string note: the filter expression cannot distinguish a
   /// custom_properties value of "" from an absent key — both project to ''
@@ -91,6 +93,16 @@ struct Common_V1_PropertyValue: Sendable {
     set {value = .timestampValue(newValue)}
   }
 
+  /// Stored as seconds in the Float64 Variant slot, like double_value, so
+  /// SUM, AVG and numeric filters work on it.
+  var durationValue: SwiftProtobuf.Google_Protobuf_Duration {
+    get {
+      if case .durationValue(let v)? = value {return v}
+      return SwiftProtobuf.Google_Protobuf_Duration()
+    }
+    set {value = .durationValue(newValue)}
+  }
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   enum OneOf_Value: Equatable, Sendable {
@@ -99,8 +111,8 @@ struct Common_V1_PropertyValue: Sendable {
     /// upstream rather than embedded as a property value. Note: max_len
     /// counts codepoints, not bytes — multi-byte UTF-8 (emoji, CJK) can
     /// exceed 1 KiB on the wire at this limit. Switch to max_bytes if a
-    /// hard byte cap is required. Values exceeding the limit are rejected
-    /// at the validate interceptor with CodeInvalidArgument (not truncated).
+    /// hard byte cap is required. An event with a longer value is dropped
+    /// as invalid_event, not truncated.
     ///
     /// Empty-string note: the filter expression cannot distinguish a
     /// custom_properties value of "" from an absent key — both project to ''
@@ -115,6 +127,9 @@ struct Common_V1_PropertyValue: Sendable {
     /// truncated by ClickHouse on insert to match the slot's precision; no
     /// Go-side truncation is performed in the worker.
     case timestampValue(SwiftProtobuf.Google_Protobuf_Timestamp)
+    /// Stored as seconds in the Float64 Variant slot, like double_value, so
+    /// SUM, AVG and numeric filters work on it.
+    case durationValue(SwiftProtobuf.Google_Protobuf_Duration)
 
   }
 
@@ -127,7 +142,7 @@ fileprivate let _protobuf_package = "common.v1"
 
 extension Common_V1_PropertyValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".PropertyValue"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}string_value\0\u{3}int_value\0\u{3}double_value\0\u{3}bool_value\0\u{3}timestamp_value\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}string_value\0\u{3}int_value\0\u{3}double_value\0\u{3}bool_value\0\u{3}timestamp_value\0\u{3}duration_value\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -180,6 +195,19 @@ extension Common_V1_PropertyValue: SwiftProtobuf.Message, SwiftProtobuf._Message
           self.value = .timestampValue(v)
         }
       }()
+      case 6: try {
+        var v: SwiftProtobuf.Google_Protobuf_Duration?
+        var hadOneofValue = false
+        if let current = self.value {
+          hadOneofValue = true
+          if case .durationValue(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.value = .durationValue(v)
+        }
+      }()
       default: break
       }
     }
@@ -210,6 +238,10 @@ extension Common_V1_PropertyValue: SwiftProtobuf.Message, SwiftProtobuf._Message
     case .timestampValue?: try {
       guard case .timestampValue(let v)? = self.value else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    }()
+    case .durationValue?: try {
+      guard case .durationValue(let v)? = self.value else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
     }()
     case nil: break
     }

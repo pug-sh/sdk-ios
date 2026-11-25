@@ -25,6 +25,9 @@ struct Sdk_Events_V1_BatchCreateRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  /// BatchCreate validates each event on its own, as an IncomingEvent, so an
+  /// event that breaks a rule, or repeats an earlier kept event's event_id, is
+  /// dropped as invalid_event and the rest are kept.
   var events: [Sdk_Events_V1_Event] = []
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -63,8 +66,13 @@ struct Sdk_Events_V1_BatchCreateResponse: Sendable {
   /// Per-reason breakdown of `dropped`, keyed by a stable reason token. This is
   /// what makes a drop actionable rather than merely visible: `salt_unavailable`
   /// is a server-side fault and the same payload may be retried, whereas
-  /// `day_out_of_range` is client clock skew that will drop again on every retry.
+  /// `day_out_of_range` is client clock skew and `invalid_event` an event that
+  /// broke a validation rule or repeated an earlier kept event's event_id, and
+  /// both drop again on every retry.
   var droppedByReason: Dictionary<String,UInt32> = [:]
+
+  /// The events dropped as `invalid_event`, in request order.
+  var invalidEvents: [Sdk_Events_V1_InvalidEvent] = []
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -72,6 +80,90 @@ struct Sdk_Events_V1_BatchCreateResponse: Sendable {
 
   fileprivate var _accepted: UInt32? = nil
   fileprivate var _dropped: UInt32? = nil
+}
+
+struct Sdk_Events_V1_InvalidEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Position in BatchCreateRequest.events, counting from 0.
+  var index: UInt32 {
+    get {_index ?? 0}
+    set {_index = newValue}
+  }
+  /// Returns true if `index` has been explicitly set.
+  var hasIndex: Bool {self._index != nil}
+  /// Clears the value of `index`. Subsequent reads from it will return its default value.
+  mutating func clearIndex() {self._index = nil}
+
+  /// The rules it broke, e.g. "event.kind: does not match regex pattern `^[a-zA-Z0-9_.-]+$`".
+  /// At most 10, then one more entry that counts the rest, e.g. "and 3 more".
+  var violations: [String] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _index: UInt32? = nil
+}
+
+/// Never sent. BatchCreate validates each event as one: Event's rules plus those
+/// that hold only at the SDK boundary, since the server fills a cookieless or
+/// crawler_request event's identity, with 'cookieless-' or 'crawler-' ids,
+/// before the EventBatch envelope re-validates it.
+struct Sdk_Events_V1_IncomingEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var event: Sdk_Events_V1_Event {
+    get {_event ?? Sdk_Events_V1_Event()}
+    set {_event = newValue}
+  }
+  /// Returns true if `event` has been explicitly set.
+  var hasEvent: Bool {self._event != nil}
+  /// Clears the value of `event`. Subsequent reads from it will return its default value.
+  mutating func clearEvent() {self._event = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _event: Sdk_Events_V1_Event? = nil
+}
+
+/// The requester a customer's server saw. The server checks it and drops it.
+struct Sdk_Events_V1_Client: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Empty when the caller doesn't know it.
+  var ip: String {
+    get {_ip ?? String()}
+    set {_ip = newValue}
+  }
+  /// Returns true if `ip` has been explicitly set.
+  var hasIp: Bool {self._ip != nil}
+  /// Clears the value of `ip`. Subsequent reads from it will return its default value.
+  mutating func clearIp() {self._ip = nil}
+
+  var userAgent: String {
+    get {_userAgent ?? String()}
+    set {_userAgent = newValue}
+  }
+  /// Returns true if `userAgent` has been explicitly set.
+  var hasUserAgent: Bool {self._userAgent != nil}
+  /// Clears the value of `userAgent`. Subsequent reads from it will return its default value.
+  mutating func clearUserAgent() {self._userAgent = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _ip: String? = nil
+  fileprivate var _userAgent: String? = nil
 }
 
 struct Sdk_Events_V1_Event: Sendable {
@@ -92,9 +184,11 @@ struct Sdk_Events_V1_Event: Sendable {
 
   var customProperties: Dictionary<String,Common_V1_PropertyValue> = [:]
 
-  /// Empty only when cookieless (event.identity_required_unless_cookieless);
-  /// never client-settable to a 'cookieless-'-prefixed value
-  /// (batch.distinct_id_reserved_prefix).
+  /// Empty only when cookieless or a crawler_request
+  /// (event.identity_required_unless_cookieless); never client-settable to a
+  /// 'cookieless-' or 'crawler-'-prefixed value
+  /// (incoming_event.distinct_id_reserved_prefix and
+  /// incoming_event.distinct_id_reserved_crawler_prefix).
   var distinctID: String {
     get {_distinctID ?? String()}
     set {_distinctID = newValue}
@@ -123,8 +217,8 @@ struct Sdk_Events_V1_Event: Sendable {
   /// Clears the value of `occurTime`. Subsequent reads from it will return its default value.
   mutating func clearOccurTime() {self._occurTime = nil}
 
-  /// A UUID whenever set; omit entirely in cookieless mode (an explicit "" is
-  /// also rejected — set fields must satisfy the uuid rule).
+  /// A UUID whenever set; omit entirely in cookieless mode (an explicit "" also
+  /// drops the event as invalid_event, since a set field must be a UUID).
   var sessionID: String {
     get {_sessionID ?? String()}
     set {_sessionID = newValue}
@@ -146,6 +240,17 @@ struct Sdk_Events_V1_Event: Sendable {
   /// Clears the value of `cookieless`. Subsequent reads from it will return its default value.
   mutating func clearCookieless() {self._cookieless = nil}
 
+  /// Only on a crawler_request event, and only from a private key, which a crawler
+  /// collector sends from the site's server.
+  var client: Sdk_Events_V1_Client {
+    get {_client ?? Sdk_Events_V1_Client()}
+    set {_client = newValue}
+  }
+  /// Returns true if `client` has been explicitly set.
+  var hasClient: Bool {self._client != nil}
+  /// Clears the value of `client`. Subsequent reads from it will return its default value.
+  mutating func clearClient() {self._client = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -156,6 +261,7 @@ struct Sdk_Events_V1_Event: Sendable {
   fileprivate var _occurTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
   fileprivate var _sessionID: String? = nil
   fileprivate var _cookieless: Bool? = nil
+  fileprivate var _client: Sdk_Events_V1_Client? = nil
 }
 
 struct Sdk_Events_V1_EventBatch: Sendable {
@@ -217,7 +323,7 @@ extension Sdk_Events_V1_BatchCreateRequest: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Sdk_Events_V1_BatchCreateResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".BatchCreateResponse"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}accepted\0\u{1}dropped\0\u{3}dropped_by_reason\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}accepted\0\u{1}dropped\0\u{3}dropped_by_reason\0\u{3}invalid_events\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -228,6 +334,7 @@ extension Sdk_Events_V1_BatchCreateResponse: SwiftProtobuf.Message, SwiftProtobu
       case 1: try { try decoder.decodeSingularUInt32Field(value: &self._accepted) }()
       case 2: try { try decoder.decodeSingularUInt32Field(value: &self._dropped) }()
       case 3: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufUInt32>.self, value: &self.droppedByReason) }()
+      case 4: try { try decoder.decodeRepeatedMessageField(value: &self.invalidEvents) }()
       default: break
       }
     }
@@ -247,6 +354,9 @@ extension Sdk_Events_V1_BatchCreateResponse: SwiftProtobuf.Message, SwiftProtobu
     if !self.droppedByReason.isEmpty {
       try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufUInt32>.self, value: self.droppedByReason, fieldNumber: 3)
     }
+    if !self.invalidEvents.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.invalidEvents, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -254,6 +364,119 @@ extension Sdk_Events_V1_BatchCreateResponse: SwiftProtobuf.Message, SwiftProtobu
     if lhs._accepted != rhs._accepted {return false}
     if lhs._dropped != rhs._dropped {return false}
     if lhs.droppedByReason != rhs.droppedByReason {return false}
+    if lhs.invalidEvents != rhs.invalidEvents {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Sdk_Events_V1_InvalidEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".InvalidEvent"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}index\0\u{1}violations\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self._index) }()
+      case 2: try { try decoder.decodeRepeatedStringField(value: &self.violations) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._index {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 1)
+    } }()
+    if !self.violations.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.violations, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Sdk_Events_V1_InvalidEvent, rhs: Sdk_Events_V1_InvalidEvent) -> Bool {
+    if lhs._index != rhs._index {return false}
+    if lhs.violations != rhs.violations {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Sdk_Events_V1_IncomingEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".IncomingEvent"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}event\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._event) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._event {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Sdk_Events_V1_IncomingEvent, rhs: Sdk_Events_V1_IncomingEvent) -> Bool {
+    if lhs._event != rhs._event {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Sdk_Events_V1_Client: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".Client"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}ip\0\u{3}user_agent\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self._ip) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._userAgent) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._ip {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._userAgent {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Sdk_Events_V1_Client, rhs: Sdk_Events_V1_Client) -> Bool {
+    if lhs._ip != rhs._ip {return false}
+    if lhs._userAgent != rhs._userAgent {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -261,7 +484,7 @@ extension Sdk_Events_V1_BatchCreateResponse: SwiftProtobuf.Message, SwiftProtobu
 
 extension Sdk_Events_V1_Event: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".Event"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}event_id\0\u{3}auto_properties\0\u{3}custom_properties\0\u{3}distinct_id\0\u{1}kind\0\u{3}occur_time\0\u{3}session_id\0\u{1}cookieless\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}event_id\0\u{3}auto_properties\0\u{3}custom_properties\0\u{3}distinct_id\0\u{1}kind\0\u{3}occur_time\0\u{3}session_id\0\u{1}cookieless\0\u{1}client\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -277,6 +500,7 @@ extension Sdk_Events_V1_Event: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
       case 6: try { try decoder.decodeSingularMessageField(value: &self._occurTime) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self._sessionID) }()
       case 8: try { try decoder.decodeSingularBoolField(value: &self._cookieless) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._client) }()
       default: break
       }
     }
@@ -311,6 +535,9 @@ extension Sdk_Events_V1_Event: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     try { if let v = self._cookieless {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 8)
     } }()
+    try { if let v = self._client {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -323,6 +550,7 @@ extension Sdk_Events_V1_Event: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if lhs._occurTime != rhs._occurTime {return false}
     if lhs._sessionID != rhs._sessionID {return false}
     if lhs._cookieless != rhs._cookieless {return false}
+    if lhs._client != rhs._client {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -5,8 +5,8 @@ import Foundation
 extension Pug {
   /// Pug's well-known events as typed calls: `Pug.track.addToCart(productId: "p1", price: 9.99)` tracks `add_to_cart`
   /// with those properties. Parameters without a default are the properties the event requires, one left `nil` is not
-  /// sent, and a duration is a `TimeInterval`, sent as text such as `"1.5s"`. `extras` adds properties; a parameter
-  /// that is set wins over an extra of its name.
+  /// sent, and a duration is a `TimeInterval` in seconds. `extras` adds properties; a parameter that is set wins over
+  /// an extra of its name.
   ///
   /// The events Pug tracks itself have no method: `app_open`, `app_close`, `app_install`, `app_update` and
   /// `screen_view`.

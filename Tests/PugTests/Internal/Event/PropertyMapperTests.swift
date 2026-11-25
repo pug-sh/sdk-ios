@@ -35,6 +35,15 @@ struct PropertyMapperTests {
     #expect(mapper.mapCustom(kind: "checkout", ["price": 10]) == ["price": .int(10)])
   }
 
+  @Test("a number for a duration property of a well-known event is sent as given, as the other SDKs send it")
+  func durationNumbers() {
+    #expect(
+      mapper.mapCustom(kind: "video_seeked", ["fromPosition": 12, "toPosition": 61.5])
+        == ["fromPosition": .int(12), "toPosition": .double(61.5)]
+    )
+    #expect(logger.entries.isEmpty)
+  }
+
   @Test("Swift scalars map onto their PropertyValue type")
   func scalars() {
     let text = "a substring"
@@ -185,6 +194,51 @@ struct PropertyMapperTests {
     #expect(mapped == ["first": .timestamp(epochMillis: first), "last": .timestamp(epochMillis: last)])
     #expect(logger.warnings.count == 4)
     #expect(logger.warnings.allSatisfy { $0.hasSuffix("the time is outside the years 1 to 9999") })
+  }
+
+  @available(macOS 13, iOS 16, tvOS 16, watchOS 9, *)
+  @Test("Swift durations map onto durations, to the nearest nanosecond")
+  func durations() {
+    let mapped = mapper.mapCustom(
+      kind: "kind",
+      [
+        "position": Duration.seconds(12.5),
+        "rewind": Duration.milliseconds(-1_500),
+        "precise": Duration(secondsComponent: 1, attosecondsComponent: 234_567_890_500_000_000),
+        "instant": Duration.zero,
+      ]
+    )
+
+    let expected: [String: PropertyValue] = [
+      "position": .duration(seconds: 12, nanos: 500_000_000),
+      "rewind": .duration(seconds: -1, nanos: -500_000_000),
+      "precise": .duration(seconds: 1, nanos: 234_567_891),
+      "instant": .duration(seconds: 0, nanos: 0),
+    ]
+    #expect(mapped == expected)
+    #expect(logger.entries.isEmpty)
+  }
+
+  // Duration.components traps past Int64 seconds, as the last two are.
+  @available(macOS 13, iOS 16, tvOS 16, watchOS 9, *)
+  @Test("durations beyond ten thousand years are dropped with a warning")
+  func durationsOutOfRange() {
+    let longest = Duration.seconds(Limits.durationSeconds.upperBound) + .nanoseconds(999_999_999)
+
+    let mapped = mapper.mapCustom(
+      kind: "kind",
+      [
+        "longest": longest,
+        "longer": longest + .nanoseconds(1),
+        "shorter": Duration.zero - longest - .nanoseconds(1),
+        "farFuture": Duration.seconds(Int64.max) * 10,
+        "farPast": Duration.zero - Duration.seconds(Int64.max) * 10,
+      ]
+    )
+
+    #expect(mapped == ["longest": .duration(seconds: Limits.durationSeconds.upperBound, nanos: 999_999_999)])
+    #expect(logger.warnings.count == 4)
+    #expect(logger.warnings.allSatisfy { $0.hasSuffix("the duration is beyond ±10,000 years") })
   }
 
   @Test("non-finite numbers are dropped with a warning")
@@ -429,7 +483,9 @@ struct PropertyMapperTests {
 
     let mapped = mapper.mapTyped(event, values: ["o1", Double.nan, 0.25, nil], extras: ["note": "extra"])
 
-    #expect(mapped == ["orderId": .string("o1"), "wait": .string("0.25s"), "note": .string("extra")])
+    #expect(
+      mapped == ["orderId": .string("o1"), "wait": .duration(seconds: 0, nanos: 250_000_000), "note": .string("extra")]
+    )
     #expect(
       logger.warnings == [
         "Property \"total\" on event \"checkout\" was dropped: nan is not a finite number",

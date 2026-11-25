@@ -26,12 +26,19 @@ enum ReferenceMessages {
   static func batchResponse(
     accepted: UInt32,
     dropped: UInt32,
-    droppedByReason: [String: UInt32]
+    droppedByReason: [String: UInt32],
+    invalidEvents: [(index: UInt32, violations: [String])] = []
   ) -> Sdk_Events_V1_BatchCreateResponse {
     var response = Sdk_Events_V1_BatchCreateResponse()
     response.accepted = accepted
     response.dropped = dropped
     response.droppedByReason = droppedByReason
+    response.invalidEvents = invalidEvents.map { source in
+      var invalid = Sdk_Events_V1_InvalidEvent()
+      invalid.index = source.index
+      invalid.violations = source.violations
+      return invalid
+    }
     return response
   }
 
@@ -60,6 +67,8 @@ enum ReferenceMessages {
       message.boolValue = bool
     case .timestamp(let epochMillis):
       message.timestampValue = timestamp(epochMillis)
+    case .duration(let seconds, let nanos):
+      message.durationValue = Google_Protobuf_Duration(seconds: seconds, nanos: nanos)
     }
     return message
   }

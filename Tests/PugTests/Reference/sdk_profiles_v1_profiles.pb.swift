@@ -25,13 +25,13 @@ struct Sdk_Profiles_V1_IdentifyRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Stable user identifier (e.g. email, database ID).
-  /// The 'cookieless-' prefix is server-owned: ingest mints those ids and the
-  /// reserved-prefix rule on BatchCreateRequest.distinct_id already refuses them
-  /// from clients. external_id needs the same guard because post-identify events
-  /// are keyed by external_id, so an id accepted here comes back as a distinct_id
-  /// that the batch rule then rejects — and because that rule is `all()`, one such
-  /// user fails the WHOLE batch, taking unrelated users' events with it.
+  /// Stable, unique user identifier: your database user ID, not an email, which
+  /// can change.
+  /// The 'cookieless-' and 'crawler-' prefixes are server-owned: ingest mints
+  /// those ids and the reserved-prefix rules on an incoming event's distinct_id
+  /// already refuse them from clients. external_id needs the same guard because
+  /// post-identify events are keyed by external_id, so an id accepted here comes
+  /// back as a distinct_id and BatchCreate drops every event of that user.
   var externalID: String {
     get {_externalID ?? String()}
     set {_externalID = newValue}
@@ -41,8 +41,9 @@ struct Sdk_Profiles_V1_IdentifyRequest: Sendable {
   /// Clears the value of `externalID`. Subsequent reads from it will return its default value.
   mutating func clearExternalID() {self._externalID = nil}
 
-  /// Profile properties — shallow-merged into existing properties. On key conflict,
-  /// these values take precedence over previously stored values.
+  /// Profile properties, shallow-merged into existing properties. On key conflict,
+  /// these values take precedence over previously stored values. A trait whose key,
+  /// or any string in it, holds a NUL can't be stored and is dropped.
   var traits: SwiftProtobuf.Google_Protobuf_Struct {
     get {_traits ?? SwiftProtobuf.Google_Protobuf_Struct()}
     set {_traits = newValue}
@@ -64,7 +65,7 @@ struct Sdk_Profiles_V1_IdentifyRequest: Sendable {
   mutating func clearAnonymousID() {self._anonymousID = nil}
 
   /// The device to assign to this profile. The SDK should send this on first
-  /// identify and on account switch (external_id changed) — not on every call,
+  /// identify and on account switch (external_id changed), not on every call,
   /// to avoid unnecessary DB writes. Omit for web SDKs without push support.
   var deviceID: String {
     get {_deviceID ?? String()}
@@ -95,6 +96,72 @@ struct Sdk_Profiles_V1_IdentifyResponse: Sendable {
   init() {}
 }
 
+struct Sdk_Profiles_V1_BatchIdentifyRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// BatchIdentify validates each item on its own with IdentifyRequest's rules,
+  /// so an invalid item is skipped and the rest are queued.
+  var identifies: [Sdk_Profiles_V1_IdentifyRequest] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+struct Sdk_Profiles_V1_BatchIdentifyResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Identifies queued for the worker, not yet applied.
+  var accepted: UInt32 {
+    get {_accepted ?? 0}
+    set {_accepted = newValue}
+  }
+  /// Returns true if `accepted` has been explicitly set.
+  var hasAccepted: Bool {self._accepted != nil}
+  /// Clears the value of `accepted`. Subsequent reads from it will return its default value.
+  mutating func clearAccepted() {self._accepted = nil}
+
+  /// The items skipped for breaking a validation rule, in request order.
+  var invalidIdentifies: [Sdk_Profiles_V1_InvalidIdentify] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _accepted: UInt32? = nil
+}
+
+struct Sdk_Profiles_V1_InvalidIdentify: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Position in BatchIdentifyRequest.identifies, counting from 0.
+  var index: UInt32 {
+    get {_index ?? 0}
+    set {_index = newValue}
+  }
+  /// Returns true if `index` has been explicitly set.
+  var hasIndex: Bool {self._index != nil}
+  /// Clears the value of `index`. Subsequent reads from it will return its default value.
+  mutating func clearIndex() {self._index = nil}
+
+  /// The rules it broke, e.g. "external_id: external_id must not start with the
+  /// reserved 'cookieless-' prefix". At most 10, then one more entry that counts
+  /// the rest, e.g. "and 3 more".
+  var violations: [String] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _index: UInt32? = nil
+}
+
 /// ProfileIdentifyMessage is the internal NATS envelope for the identify worker.
 /// project_id is injected server-side from the authenticated principal.
 struct Sdk_Profiles_V1_ProfileIdentifyMessage: Sendable {
@@ -103,8 +170,8 @@ struct Sdk_Profiles_V1_ProfileIdentifyMessage: Sendable {
   // methods supported on all messages.
 
   /// Mirrors IdentifyRequest.external_id: the worker re-validates this envelope,
-  /// so the reserved prefix is enforced at both stages rather than trusting that
-  /// the value only ever arrives from an already-validated request.
+  /// so its rules hold at both stages rather than trusting that the value only
+  /// ever arrives from an already-validated request.
   var externalID: String {
     get {_externalID ?? String()}
     set {_externalID = newValue}
@@ -228,6 +295,114 @@ extension Sdk_Profiles_V1_IdentifyResponse: SwiftProtobuf.Message, SwiftProtobuf
   }
 
   static func ==(lhs: Sdk_Profiles_V1_IdentifyResponse, rhs: Sdk_Profiles_V1_IdentifyResponse) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Sdk_Profiles_V1_BatchIdentifyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".BatchIdentifyRequest"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}identifies\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.identifies) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.identifies.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.identifies, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Sdk_Profiles_V1_BatchIdentifyRequest, rhs: Sdk_Profiles_V1_BatchIdentifyRequest) -> Bool {
+    if lhs.identifies != rhs.identifies {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Sdk_Profiles_V1_BatchIdentifyResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".BatchIdentifyResponse"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}accepted\0\u{3}invalid_identifies\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self._accepted) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.invalidIdentifies) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._accepted {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 1)
+    } }()
+    if !self.invalidIdentifies.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.invalidIdentifies, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Sdk_Profiles_V1_BatchIdentifyResponse, rhs: Sdk_Profiles_V1_BatchIdentifyResponse) -> Bool {
+    if lhs._accepted != rhs._accepted {return false}
+    if lhs.invalidIdentifies != rhs.invalidIdentifies {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Sdk_Profiles_V1_InvalidIdentify: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".InvalidIdentify"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}index\0\u{1}violations\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self._index) }()
+      case 2: try { try decoder.decodeRepeatedStringField(value: &self.violations) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._index {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 1)
+    } }()
+    if !self.violations.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.violations, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Sdk_Profiles_V1_InvalidIdentify, rhs: Sdk_Profiles_V1_InvalidIdentify) -> Bool {
+    if lhs._index != rhs._index {return false}
+    if lhs.violations != rhs.violations {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

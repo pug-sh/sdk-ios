@@ -126,6 +126,25 @@ struct ClientTests {
     )
   }
 
+  @available(macOS 13, iOS 16, tvOS 16, watchOS 9, *)
+  @Test("a number for an untyped well-known duration property is sent as it is, with a warning")
+  func numericDurations() throws {
+    let client = try makeClient { $0.batchMaxSize = 3 }
+
+    client.track("video_play", properties: ["videoId": "v1", "position": 1_500], options: nil)
+    client.track("video_play", properties: ["videoId": "v1", "position": 1.5], options: nil)
+    client.track("video_play", properties: ["videoId": "v1", "position": Duration.milliseconds(1_500)], options: nil)
+    scheduler.runCurrent()
+
+    #expect(
+      try transport.batches.single().map { $0.customProperties["position"] } == [
+        .int(1_500), .double(1.5), .duration(seconds: 1, nanos: 500_000_000),
+      ]
+    )
+    let warning = "Property \"position\" on event \"video_play\" takes a Duration; the number given is sent as it is"
+    #expect(logger.warnings == [warning, warning])
+  }
+
   @Test("an event tracked on the main thread reads the device anew, as after a rotation")
   func refreshesDevice() throws {
     let client = try makeClient()
@@ -191,7 +210,10 @@ struct ClientTests {
     let event = try transport.batches.single().single()
     #expect(event.kind == "video_play")
     #expect(
-      event.customProperties == ["videoId": .string("v1"), "position": .string("1.5s"), "quality": .string("hd")])
+      event.customProperties == [
+        "videoId": .string("v1"), "position": .duration(seconds: 1, nanos: 500_000_000), "quality": .string("hd"),
+      ]
+    )
   }
 
   @Test("nothing is tracked or identified while consent is denied")
@@ -267,6 +289,7 @@ struct ClientTests {
 
     client.identify(" ", traits: nil)
     client.identify("cookieless-abc", traits: nil)
+    client.identify("crawler-abc", traits: nil)
     scheduler.runCurrent()
 
     #expect(transport.identifies.isEmpty)
@@ -274,6 +297,7 @@ struct ClientTests {
       logger.errors == [
         "identify() was dropped: externalId is blank",
         "identify() was dropped: externalId may not start with \"cookieless-\"",
+        "identify() was dropped: externalId may not start with \"crawler-\"",
       ]
     )
   }

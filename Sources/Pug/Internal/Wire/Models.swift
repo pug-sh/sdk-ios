@@ -4,6 +4,8 @@ enum PropertyValue: Equatable, Sendable {
   case double(Double)
   case bool(Bool)
   case timestamp(epochMillis: Int64)
+  // Normalized as google.protobuf.Duration requires: nanos within a second, of the sign of seconds.
+  case duration(seconds: Int64, nanos: Int32)
 }
 
 struct Event: Equatable, Sendable {
@@ -34,4 +36,11 @@ struct IdentifyRequest: Equatable, Sendable {
 struct BatchCreateResponse: Equatable, Sendable {
   var accepted: Int64
   var droppedByReason: [String: Int64]
+  var invalidEvents: [InvalidEvent] = []
+}
+
+struct InvalidEvent: Equatable, Sendable {
+  /// The event's position in the batch sent.
+  var index: Int64
+  var violations: [String]
 }

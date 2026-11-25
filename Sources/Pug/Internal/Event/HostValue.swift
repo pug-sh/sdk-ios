@@ -8,6 +8,7 @@ struct UnsupportedValue: Error {
   }
 
   static let outOfRangeTime = UnsupportedValue("the time is outside the years 1 to 9999")
+  static let outOfRangeDuration = UnsupportedValue("the duration is beyond ±10,000 years")
 }
 
 /// A host value as properties and traits read it. Nil for `nil`, `Optional.none` and `NSNull`.
@@ -19,6 +20,8 @@ enum HostValue {
   // An integer too wide for int64 keeps its exact digits rather than rounding through a double.
   case digits(String)
   case date(Date)
+  // A Swift Duration, as its components.
+  case duration(seconds: Int64, attoseconds: Int64)
   case array([Any])
   // Unordered, so read in the order of the elements' JSON text.
   case set([Any])
@@ -49,6 +52,8 @@ enum HostValue {
       self = .text(text)
     } else if let date = value as? Date {
       self = .date(date)
+    } else if #available(macOS 13, iOS 16, tvOS 16, watchOS 9, *), let duration = value as? Duration {
+      self.init(duration: duration)
     } else if let object = value as? [AnyHashable: Any] {
       self = .object(object)
     } else if let set = value as? Set<AnyHashable> {
@@ -58,6 +63,15 @@ enum HostValue {
     } else {
       self = .other(String(describing: value))
     }
+  }
+
+  // Clamped first, since Duration.components traps past Int64 seconds. The bounds lie just beyond the range of
+  // google.protobuf.Duration, so a clamped value still reads as out of range.
+  @available(macOS 13, iOS 16, tvOS 16, watchOS 9, *)
+  private init(duration: Duration) {
+    let bound = Limits.durationSeconds.upperBound + 1
+    let (seconds, attoseconds) = min(max(duration, .seconds(-bound)), .seconds(bound)).components
+    self = .duration(seconds: seconds, attoseconds: attoseconds)
   }
 
   // A boolean is a CFBoolean, on Linux too, whose objCType is the "c" of a char.
@@ -127,7 +141,8 @@ private func decimalDouble<Value: BinaryFloatingPoint>(_ value: Value) -> Double
 
 /// Host values as JSON, for identify traits and for properties holding collections. Follows
 /// `JSON.stringify` where it can: non-finite numbers become null and dates ISO 8601 strings. Integers
-/// beyond ±(2^53 - 1) become strings, since a JSON number would round them.
+/// beyond ±(2^53 - 1) become strings, since a JSON number would round them. Durations become seconds,
+/// as the server stores a duration property.
 struct HostJSON {
   static let maxSafeInteger: Int64 = 9_007_199_254_740_991
   private static let maxDepth = 32
@@ -157,6 +172,9 @@ struct HostJSON {
         throw .outOfRangeTime
       }
       return .string(iso8601(epochMillis: millis))
+    case .duration(let seconds, let attoseconds):
+      guard Limits.durationSeconds.contains(seconds) else { throw .outOfRangeDuration }
+      return .number(Double(seconds) + Double(attoseconds) / 1e18)
     case .array(let elements):
       return .array(try convert(elements: elements, depth: depth))
     case .set(let elements):

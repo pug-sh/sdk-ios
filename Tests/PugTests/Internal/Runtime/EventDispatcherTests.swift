@@ -200,7 +200,55 @@ struct EventDispatcherTests {
     #expect(storage.string(forKey: Self.key) == nil)
   }
 
-  @Test("an acknowledgement that cannot be read still delivers the batch")
+  @Test("the first three invalid events are named by their kind, with the rules they broke")
+  func invalidEvents() {
+    let invalid = [
+      InvalidEvent(index: 0, violations: ["event.session_id: value must be a valid UUID", "and 2 more"]),
+      InvalidEvent(index: 2, violations: ["event.event_id: repeats the event at index 1"]),
+      InvalidEvent(index: 7, violations: ["event.kind: value is required"]),
+      InvalidEvent(index: 1, violations: ["event.kind: value is required"]),
+    ]
+    transport.answerNextBatch(
+      BatchCreateResponse(accepted: 1, droppedByReason: ["invalid_event": 4], invalidEvents: invalid))
+    let dispatcher = makeDispatcher(maxSize: 5)
+
+    events(0..<5).forEach(dispatcher.enqueue)
+    scheduler.runCurrent()
+
+    #expect(
+      logger.warnings == [
+        "The server accepted 1 of 5 events (dropped: invalid_event: 4). Invalid events: \"event_0\": "
+          + "event.session_id: value must be a valid UUID; and 2 more | \"event_2\": event.event_id: repeats the event "
+          + "at index 1 | event 7: event.kind: value is required | and 1 more"
+      ]
+    )
+    #expect(storage.string(forKey: Self.key) == nil)
+  }
+
+  @Test("an immediate event the server finds invalid is named in the warning")
+  func invalidImmediateEvent() {
+    transport.answerNextBatch(
+      BatchCreateResponse(
+        accepted: 0,
+        droppedByReason: ["invalid_event": 1],
+        invalidEvents: [InvalidEvent(index: 0, violations: ["event.kind: value is required"])]
+      )
+    )
+    let dispatcher = makeDispatcher()
+
+    dispatcher.sendNow(event(0))
+    scheduler.runCurrent()
+
+    #expect(
+      logger.warnings == [
+        "The server accepted 0 of 1 event (dropped: invalid_event: 1). Invalid events: \"event_0\": event.kind: "
+          + "value is required"
+      ]
+    )
+    #expect(storage.string(forKey: Self.key) == nil)
+  }
+
+  @Test("an acknowledgement that cannot be read still delivers the batch, with a warning that drops go unreported")
   func unreadableAcknowledgement() {
     transport.answerNextBatch(nil)
     let dispatcher = makeDispatcher()
@@ -209,7 +257,11 @@ struct EventDispatcherTests {
     scheduler.runCurrent()
 
     #expect(storage.string(forKey: Self.key) == nil)
-    #expect(logger.warnings.isEmpty)
+    #expect(
+      logger.warnings == [
+        "Sent 3 events, but the server's answer could not be read: any events it dropped are not reported"
+      ]
+    )
   }
 
   @Test("the network error behind a failure is logged with it")

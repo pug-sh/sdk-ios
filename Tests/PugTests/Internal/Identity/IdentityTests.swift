@@ -229,10 +229,11 @@ struct IdentityTests {
     #expect(logger.warnings == [#"The stored anonymous id lacks the "anon-" prefix; a new one will be used"#])
   }
 
-  @Test("an external id with the reserved prefix is discarded and the device healed")
-  func reservedExternalId() {
-    memory.setString(#"{"anonymousId":"anon-1","externalId":"cookieless-abc"}"#, forKey: keys.profile)
-    memory.setString("cookieless-abc", forKey: keys.externalId)
+  @Test(
+    "an external id with a reserved prefix is discarded and the device healed", arguments: ["cookieless-", "crawler-"])
+  func reservedExternalId(prefix: String) {
+    memory.setString(#"{"anonymousId":"anon-1","externalId":"\#(prefix)abc"}"#, forKey: keys.profile)
+    memory.setString("\(prefix)abc", forKey: keys.externalId)
 
     let identity = makeIdentity()
 
@@ -242,8 +243,16 @@ struct IdentityTests {
     #expect(memory.string(forKey: keys.profile) == #"{"anonymousId":"anon-1"}"#)
     #expect(logger.warnings.count == 1)
     #expect(
-      logger.warnings.first?.hasPrefix(#"The stored external id uses the reserved "cookieless-" prefix"#) == true
+      logger.warnings.first?.hasPrefix(#"The stored external id uses the reserved "\#(prefix)" prefix"#) == true
     )
+  }
+
+  // The server compares bytes, where hasPrefix would compare the hyphen and the mark joined to it as one character.
+  @Test("a reserved prefix matches on UTF-8 bytes, even when a combining mark joins its hyphen")
+  func reservedPrefixBytes() {
+    #expect(Identity.reservedPrefix(of: "crawler-\u{301}x") == "crawler-")
+    #expect(Identity.reservedPrefix(of: "cookieless-\u{301}x") == "cookieless-")
+    #expect(Identity.reservedPrefix(of: "crawlers-1") == nil)
   }
 
   private func storedSessionTime(_ name: String) throws -> Int64? {

@@ -18,14 +18,21 @@ extension String {
 
 struct EventFactory: Sendable {
   static let platform = "ios"
+  // A crawler collector's kind: the server requires the crawler's request on it and no identity, so it drops every
+  // SDK event of this kind.
+  private static let crawlerRequest = "crawler_request"
 
   let projectId: String
   let logger: SafeLogger
   let properties: PropertyMapper
   let ids: any IdGenerator
 
-  /// Logs and returns false for a kind the server would reject along with the rest of its batch.
+  /// Logs and returns false for a kind the server refuses.
   func acceptsKind(_ kind: String) -> Bool {
+    if kind == Self.crawlerRequest {
+      logger.warning("Event \"\(kind)\" was dropped: the kind is reserved for server-side crawler collectors")
+      return false
+    }
     if kind.isValidKind {
       return true
     }

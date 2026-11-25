@@ -161,7 +161,23 @@ final class HTTPTransportTests {
     #expect(try await send().get() == nil)
   }
 
-  @Test("a response is read up to 64 KiB")
+  @Test("an acknowledgement naming a full batch of invalid events is read whole")
+  func largeAcknowledgement() async throws {
+    let violation = "event.kind: does not match regex pattern `^[a-zA-Z0-9_.-]+$`"
+    let invalid = (0..<1_000).map { (index: UInt32($0), violations: [violation, violation]) }
+    let answer =
+      try ReferenceMessages.batchResponse(
+        accepted: 0, dropped: 1_000, droppedByReason: ["invalid_event": 1_000], invalidEvents: invalid
+      ).serializedBytes() as [UInt8]
+    #expect(answer.count > 64 * 1_024)
+    server.enqueueProtobuf(answer)
+
+    let response = try #require(try await send().get())
+
+    #expect(response.invalidEvents == invalid.map { InvalidEvent(index: Int64($0.index), violations: $0.violations) })
+  }
+
+  @Test("a response is read up to 2 MiB")
   func responseCap() async throws {
     server.enqueueProtobuf(acknowledgement(padding: HTTPTransport.maxResponseBytes - 100))
     server.enqueueProtobuf(acknowledgement(padding: HTTPTransport.maxResponseBytes))

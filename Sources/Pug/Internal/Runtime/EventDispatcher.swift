@@ -5,6 +5,7 @@ final class EventDispatcher: @unchecked Sendable {
   static let retryFloorMillis: Int64 = 1_000
   static let retryCapMillis: Int64 = 5 * 60 * 1_000
   private static let retryJitter = 0.2
+  private static let maxInvalidReported = 3
 
   private struct ImmediateSend {
     let id: Int
@@ -155,7 +156,7 @@ final class EventDispatcher: @unchecked Sendable {
   }
 
   private func sent(_ batch: EventQueue.Batch, generation: Int, _ result: BatchResult) {
-    let failure = settle(result, events: batch.events.count)
+    let failure = settle(result, events: batch.events)
     guard !disposed else { return }
     // Purged while in flight: there is nothing to put back or to back off for.
     guard generation == self.generation else {
@@ -177,7 +178,7 @@ final class EventDispatcher: @unchecked Sendable {
   }
 
   private func sent(_ immediate: ImmediateSend, _ result: BatchResult) {
-    let failure = settle(result, events: 1)
+    let failure = settle(result, events: [immediate.event])
     guard !disposed else { return }
     immediateSends.removeAll { $0.id == immediate.id }
     if let failure, immediate.generation == generation {
@@ -197,27 +198,46 @@ final class EventDispatcher: @unchecked Sendable {
   }
 
   /// Logs how a send went. Returns the failure when its events should be sent again.
-  private func settle(_ result: BatchResult, events: Int) -> TransportError? {
+  private func settle(_ result: BatchResult, events: [Event]) -> TransportError? {
     switch result {
     case .failure(let failure) where !failure.isPermanent:
       return failure
     case .failure(let failure):
       recovered()
-      logger.error("\(eventCount(events)) dropped: rejected by the server (\(failure))", error: failure.underlying)
-    case .success(let response):
+      logger.error(
+        "\(eventCount(events.count)) dropped: rejected by the server (\(failure))", error: failure.underlying)
+    case .success(nil):
       recovered()
-      if let response, response.accepted < Int64(events) {
+      logger.warning(
+        "Sent \(eventCount(events.count)), but the server's answer could not be read: "
+          + "any events it dropped are not reported")
+    case .success(let response?):
+      recovered()
+      if response.accepted < Int64(events.count) {
         warnPartiallyAccepted(response, sent: events)
       }
-      logger.debug("Sent \(eventCount(events))")
+      logger.debug("Sent \(eventCount(events.count))")
     }
     return nil
   }
 
-  private func warnPartiallyAccepted(_ response: BatchCreateResponse, sent: Int) {
+  // The server checks each event on its own and keeps the rest, so a send that succeeded can still lose events,
+  // and once the batch is committed this warning is all that is left of them.
+  private func warnPartiallyAccepted(_ response: BatchCreateResponse, sent events: [Event]) {
     let reasons = response.droppedByReason.sortedByUTF16Key().map { "\($0.key): \($0.value)" }
-    let detail = reasons.isEmpty ? "" : " (dropped: \(reasons.joined(separator: ", ")))"
-    logger.warning("The server accepted \(response.accepted) of \(eventCount(sent))\(detail)")
+    var detail = reasons.isEmpty ? "" : " (dropped: \(reasons.joined(separator: ", ")))"
+    var invalid = response.invalidEvents.prefix(Self.maxInvalidReported).map { entry in
+      let event = Int(exactly: entry.index).flatMap { events.indices.contains($0) ? events[$0] : nil }
+      let name = event.map { "\"\($0.kind)\"" } ?? "event \(entry.index)"
+      return "\(name): \(entry.violations.joined(separator: "; "))"
+    }
+    if response.invalidEvents.count > Self.maxInvalidReported {
+      invalid.append("and \(response.invalidEvents.count - Self.maxInvalidReported) more")
+    }
+    if !invalid.isEmpty {
+      detail += ". Invalid events: \(invalid.joined(separator: " | "))"
+    }
+    logger.warning("The server accepted \(response.accepted) of \(eventCount(events.count))\(detail)")
   }
 
   private func retryLater(_ failure: TransportError, events: Int) {
