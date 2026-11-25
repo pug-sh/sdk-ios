@@ -100,6 +100,7 @@ final class Client: Sendable {
     let custom = properties.map { propertyMapper.mapCustom(kind: kind, $0) } ?? [:]
     if let event = WellKnownEvents.byKind[kind] {
       reportMissing(event, custom)
+      propertyMapper.warnNumericDurations(event, custom)
     }
     submitCapture("Pug.track()", kind, custom, at: callTime, options: options)
   }

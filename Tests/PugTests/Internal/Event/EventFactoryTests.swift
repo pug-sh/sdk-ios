@@ -32,6 +32,18 @@ struct EventFactoryTests {
     #expect(logger.warnings.count == 5)
   }
 
+  @Test("the crawler collectors' kind is dropped")
+  func crawlerRequestKind() {
+    #expect(!factory.acceptsKind("crawler_request"))
+    #expect(factory.acceptsKind("crawler_requests"))
+
+    #expect(
+      logger.warnings == [
+        "Event \"crawler_request\" was dropped: the kind is reserved for server-side crawler collectors"
+      ]
+    )
+  }
+
   @Test("blank kinds are dropped")
   func blankKinds() {
     #expect(!factory.acceptsKind(""))

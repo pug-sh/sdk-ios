@@ -24,6 +24,18 @@ targets: [
 ],
 ```
 
+### Upgrading from 0.1.1 or earlier
+
+- Durations go out as durations, which the server stores as seconds, instead of text such as
+  `"1.5s"`: the typed methods' duration arguments and any `Duration` property. A `Duration` trait,
+  or one inside a dictionary, array or set property, is a number of seconds. Filters and charts on
+  the old text do not match the new events.
+- A self-hosted server and events worker must be at v0.0.65 or later first: an older server drops
+  the events that carry a duration, and an older events worker loses their whole batch.
+- An id starting with `crawler-` is refused like one starting with `cookieless-`, and a stored one
+  is discarded, so that user is anonymous until the next `identify`.
+- Going back to 0.1.1 drops the queued events that carry a duration.
+
 ## Quickstart
 
 Call `Pug.initialize` once, in `application(_:didFinishLaunchingWithOptions:)` or, in a SwiftUI
@@ -104,7 +116,8 @@ Pug.track("order_completed", properties: ["orderId": "o-1"], options: Pug.TrackO
 ```
 
 An event kind may contain letters, digits, `_`, `.` and `-`; any other kind is dropped with a
-warning. Property values map as follows:
+warning, and so is `crawler_request`, which the server keeps for crawler collectors. Property values
+map as follows:
 
 | Value | Sent as |
 | ----- | ------- |
@@ -114,8 +127,8 @@ warning. Property values map as follows:
 | `Double`, `Float`, `CGFloat`, `Decimal` | decimal; NaN and infinities are dropped |
 | `NSNumber` | by what it holds: boolean, integer or decimal |
 | `Date` | timestamp |
-| `Duration` (iOS 16 and later) | duration, to the nanosecond; one beyond 10,000 years is dropped |
-| arrays, dictionaries and sets | JSON text |
+| `Duration` (iOS 16 and later) | duration, to the nanosecond, which the server stores as seconds; one beyond 10,000 years is dropped |
+| arrays, dictionaries and sets | JSON text, with a duration inside as a number of seconds |
 | `nil`, `Optional.none`, `NSNull` | left out |
 | anything else, such as `UUID`, `URL` or another enum | its `String(describing:)`, cut to 1024 UTF-8 bytes |
 
@@ -152,7 +165,8 @@ Pug.track.addToCart(
 - `extras` carries further properties. An extra named like an argument is dropped with a warning
   when that argument is set.
 - Durations are `TimeInterval` seconds, sent as durations rounded to the nanosecond: `position: 1.5`
-  is a second and a half. They need server v0.0.65 or later, like any duration.
+  is a second and a half. They need a server and events worker at v0.0.65 or later, like any
+  duration.
 - Values are sent as given: the schemas name and type the properties, but neither the SDK nor the
   server enforces their ranges and patterns.
 - The events the SDK tracks itself have no method: `app_open`, `app_close`, `app_install`,
@@ -162,7 +176,8 @@ Pug.track.addToCart(
 The kinds are constants in `Pug.Events` (`Pug.Events.addToCart` is `"add_to_cart"`). Tracking a
 well-known kind with `Pug.track(_:properties:)` works too, and a whole number given for a decimal
 property is sent as a decimal (`"price": 10` arrives as `10.0`), so both paths fill the same column.
-For a duration property, pass a `Duration` there, on iOS 16 and later.
+For a duration property, pass a `Duration` there, on iOS 16 and later: a number is sent as it is,
+with a warning.
 
 ## Automatic events
 

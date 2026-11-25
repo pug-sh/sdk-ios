@@ -162,7 +162,7 @@ review the diff. `make check-proto-pin` proves `proto/` matches the pin.
   is transient (captive portals). Answers arrive on any thread: `EventDispatcher` hops them to the
   worker and re-checks `disposed` and the purge generation before touching the queue. A timer
   cancels each request at its deadline, since URLSession's timeouts measure idleness; bodies are
-  read up to 64 KiB, and redirects are refused so the API key stays with the endpoint's host.
+  read up to 2 MiB, and redirects are refused so the API key stays with the endpoint's host.
 - **Unreadable storage is a failure, never an absent key** (where Android reads it as absent): iOS
   can launch an app before the first unlock after a reboot, when its files cannot be read.
   `FileStorage` throws, and the client waits for the unlock (`whenProtectedDataAvailable`) before it

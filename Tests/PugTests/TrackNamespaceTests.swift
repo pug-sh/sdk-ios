@@ -130,6 +130,18 @@ struct TrackNamespaceTests {
     #expect(facade.calls.first?.properties["price"] == .double(10))
   }
 
+  @Test("a number in the extras for a duration property is sent as it is, with a warning")
+  func extrasNumericDuration() {
+    track.videoPlay(videoId: "v1", extras: ["position": 1_500])
+
+    #expect(facade.calls.first?.properties["position"] == .int(1_500))
+    #expect(
+      logger.warnings == [
+        "Property \"position\" on event \"video_play\" takes a Duration; the number given is sent as it is"
+      ]
+    )
+  }
+
   @Test("arguments and extras get the checks of untyped properties")
   func checks() {
     track.addToCart(productId: String(repeating: "x", count: 2_000), extras: ["$sku": "s1"])

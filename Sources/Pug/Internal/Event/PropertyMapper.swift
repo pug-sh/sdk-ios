@@ -48,7 +48,22 @@ struct PropertyMapper: Sendable {
     if !missing.isEmpty {
       logger.warning("\(caller) was tracked without its required \(missing.joined(separator: ", "))")
     }
+    warnNumericDurations(event, custom)
     return custom
+  }
+
+  // The server stores a duration in seconds, so a number in the same property, in whatever unit the caller meant,
+  // would be summed and averaged with it.
+  func warnNumericDurations(_ event: EventSchema, _ properties: [String: PropertyValue]) {
+    for field in event.fields where field.type == .duration {
+      switch properties[field.name] {
+      case .int?, .double?:
+        logger.warning(
+          "Property \"\(field.name)\" on event \"\(event.kind)\" takes a Duration; the number given is sent as it is")
+      default:
+        continue
+      }
+    }
   }
 
   private func map(kind: String, _ properties: [String: Any], auto: Bool) -> [String: PropertyValue] {
