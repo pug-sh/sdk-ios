@@ -5,22 +5,34 @@ updates:
   - package-ecosystem: "swift"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     ignore:
       - dependency-name: "github.com/apple/swift-protobuf"
         versions: [">= 1.38.0"]
+    groups:
+      swift-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   # gen-track stays on the root's swift-protobuf release.
   - package-ecosystem: "swift"
     directory: "/Tools"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     ignore:
       - dependency-name: "github.com/apple/swift-protobuf"
         versions: [">= 1.38.0"]
+    groups:
+      tools-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   # The workflows pin actions by commit; without this they would never move.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    groups:
+      actions-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
